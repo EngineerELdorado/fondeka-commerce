@@ -1044,6 +1044,13 @@ button:disabled {
     font-weight: 950;
 }
 
+.payment-method-tile-image {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
 .payment-method-tile .currency-badge {
     position: absolute;
     top: 6px;
@@ -1078,6 +1085,59 @@ button:disabled {
     color: var(--muted);
     font-size: 13px;
     line-height: 1.4;
+}
+
+.crypto-network-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.crypto-network-label {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.crypto-network-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.crypto-network-pill {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 10px 12px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.crypto-network-pill--active {
+    border-color: rgba(79, 128, 92, 0.68);
+    background: var(--brand-soft);
+    color: var(--brand-dark);
+}
+
+.crypto-network-dot {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    border: 2px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.crypto-network-pill--active .crypto-network-dot {
+    border-color: var(--brand);
+    background: var(--brand);
 }
 
 .payment-method-hint {

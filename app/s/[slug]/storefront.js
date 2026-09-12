@@ -250,6 +250,17 @@ function normalizePaymentMethod(method) {
     };
 }
 
+function normalizeCryptoNetwork(network) {
+    const id = network?.id ?? network?.networkId ?? null;
+    const name = network?.displayName || network?.name || network?.networkName || network?.code || 'Network';
+    return {
+        ...network,
+        id,
+        name,
+        displayName: network?.displayName || name,
+    };
+}
+
 function feeQuotePayload(feeQuote, order, paymentMethod) {
     const netAmount = number(feeQuote?.netAmount ?? order?.billingAmount ?? order?.paymentAmount);
     const netCurrency = feeQuote?.netAmountCurrency || order?.billingCurrency || order?.paymentCurrency || paymentMethod?.currency || '';
@@ -300,6 +311,10 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [discoveredPaymentMethods, setDiscoveredPaymentMethods] = useState([]);
     const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
     const [paymentMethodsError, setPaymentMethodsError] = useState(null);
+    const [cryptoNetworks, setCryptoNetworks] = useState([]);
+    const [cryptoNetworksLoading, setCryptoNetworksLoading] = useState(false);
+    const [cryptoNetworksError, setCryptoNetworksError] = useState(null);
+    const [selectedCryptoNetworkId, setSelectedCryptoNetworkId] = useState(null);
     const [countryCode, setCountryCode] = useState(() => normalizeCountryCode(initialCountry));
     const [showCountryPicker, setShowCountryPicker] = useState(false);
     const [countryQuery, setCountryQuery] = useState('');
@@ -378,6 +393,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const paymentMethods = discoveredPaymentMethods;
+    const selectedPaymentMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
     const selectedCountry = COUNTRIES_BY_CODE[countryCode] || COUNTRIES_BY_CODE.CD;
     const filteredCountries = useMemo(() => {
         const query = countryQuery.trim().toLowerCase();
@@ -402,6 +418,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setOrder(null);
         setDiscoveredPaymentMethods([]);
         setPaymentMethodsError(null);
+        setCryptoNetworks([]);
+        setCryptoNetworksError(null);
+        setSelectedCryptoNetworkId(null);
         setFlowError(null);
     };
 
@@ -418,6 +437,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
     const updatePaymentMethod = (methodKey) => {
         setPaymentMethod(String(methodKey || ''));
+        setCryptoNetworks([]);
+        setCryptoNetworksError(null);
+        setSelectedCryptoNetworkId(null);
         setQuote(null);
         setCheckout(null);
         setFlowError(null);
@@ -430,6 +452,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
         if (!selectedMethod?.id) return `${selectedMethod?.name || 'This payment method'} is not configured for web checkout yet.`;
         if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return 'Buyer phone is required for Mobile Money.';
+        if (selectedMethod.type === 'CRYPTO' && !selectedCryptoNetworkId) return 'Choose a crypto network.';
         return null;
     };
 
@@ -532,7 +555,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     body: JSON.stringify({
                         paymentMethodId: methodForPayment.id,
                         accountNumber: methodForPayment.type === 'MOBILE_MONEY' ? buyer.phone.trim() : null,
-                        networkId: methodForPayment.networkId || null,
+                        networkId: methodForPayment.type === 'CRYPTO' ? selectedCryptoNetworkId : (methodForPayment.networkId || null),
                         amount: paymentQuote.paymentAmount ?? paymentQuote.grossAmount ?? currentOrder.billingAmount ?? currentOrder.paymentAmount,
                         currency: paymentQuote.paymentCurrency || paymentQuote.grossAmountCurrency || currentOrder.billingCurrency || currentOrder.paymentCurrency,
                         paymentMethod: {
@@ -560,6 +583,43 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     useEffect(() => {
         if (paymentMethod && !paymentMethods.some((method) => method.key === paymentMethod)) setPaymentMethod('');
     }, [paymentMethod, paymentMethods]);
+
+    useEffect(() => {
+        if (selectedPaymentMethod?.type !== 'CRYPTO' || !selectedPaymentMethod.id) {
+            setCryptoNetworks([]);
+            setCryptoNetworksError(null);
+            setSelectedCryptoNetworkId(null);
+            return undefined;
+        }
+
+        let cancelled = false;
+        setCryptoNetworksLoading(true);
+        setCryptoNetworksError(null);
+        apiFetch(`/public/payment-methods/${encodeURIComponent(selectedPaymentMethod.id)}/networks`)
+            .then((payload) => {
+                if (cancelled) return;
+                const networks = pageItems(payload).map(normalizeCryptoNetwork).filter((network) => network.id);
+                setCryptoNetworks(networks);
+                setSelectedCryptoNetworkId((current) => (
+                    current && networks.some((network) => network.id === current)
+                        ? current
+                        : (networks[0]?.id ?? null)
+                ));
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                setCryptoNetworks([]);
+                setSelectedCryptoNetworkId(null);
+                setCryptoNetworksError(readError(error, 'Unable to load crypto networks.'));
+            })
+            .finally(() => {
+                if (!cancelled) setCryptoNetworksLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedPaymentMethod?.id, selectedPaymentMethod?.type]);
 
     useEffect(() => {
         if (!cartItems.length) {
@@ -657,6 +717,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 setCheckout(null);
                 setDiscoveredPaymentMethods([]);
                 setPaymentMethodsError(null);
+                setCryptoNetworks([]);
+                setCryptoNetworksError(null);
+                setSelectedCryptoNetworkId(null);
                 setFlowError(null);
             }}
         />
@@ -690,6 +753,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         paymentMethods={paymentMethods}
                         paymentMethodsLoading={paymentMethodsLoading}
                         paymentMethodsError={paymentMethodsError}
+                        cryptoNetworks={cryptoNetworks}
+                        cryptoNetworksLoading={cryptoNetworksLoading}
+                        cryptoNetworksError={cryptoNetworksError}
+                        selectedCryptoNetworkId={selectedCryptoNetworkId}
+                        setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
                         onOpenCountryPicker={() => {
                             setCountryQuery('');
@@ -753,6 +821,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                             paymentMethods={paymentMethods}
                             paymentMethodsLoading={paymentMethodsLoading}
                             paymentMethodsError={paymentMethodsError}
+                            cryptoNetworks={cryptoNetworks}
+                            cryptoNetworksLoading={cryptoNetworksLoading}
+                            cryptoNetworksError={cryptoNetworksError}
+                            selectedCryptoNetworkId={selectedCryptoNetworkId}
+                            setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                             selectedCountry={selectedCountry}
                             buyerDetailsOpen={buyerDetailsOpen}
                             setBuyerDetailsOpen={setBuyerDetailsOpen}
@@ -818,6 +891,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         paymentMethods={paymentMethods}
                         paymentMethodsLoading={paymentMethodsLoading}
                         paymentMethodsError={paymentMethodsError}
+                        cryptoNetworks={cryptoNetworks}
+                        cryptoNetworksLoading={cryptoNetworksLoading}
+                        cryptoNetworksError={cryptoNetworksError}
+                        selectedCryptoNetworkId={selectedCryptoNetworkId}
+                        setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
                         buyerDetailsOpen={buyerDetailsOpen}
                         setBuyerDetailsOpen={setBuyerDetailsOpen}
@@ -1057,6 +1135,11 @@ function CheckoutPaymentForm({
     paymentMethods,
     paymentMethodsLoading,
     paymentMethodsError,
+    cryptoNetworks,
+    cryptoNetworksLoading,
+    cryptoNetworksError,
+    selectedCryptoNetworkId,
+    setSelectedCryptoNetworkId,
     selectedCountry,
     buyerDetailsOpen,
     setBuyerDetailsOpen,
@@ -1140,6 +1223,11 @@ function CheckoutPaymentForm({
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
+                    cryptoNetworks={cryptoNetworks}
+                    cryptoNetworksLoading={cryptoNetworksLoading}
+                    cryptoNetworksError={cryptoNetworksError}
+                    selectedCryptoNetworkId={selectedCryptoNetworkId}
+                    setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                     selectedCountry={selectedCountry}
                     onOpenCountryPicker={onOpenCountryPicker}
                 />
@@ -1192,6 +1280,11 @@ function OrderPaymentPanel({
     paymentMethods,
     paymentMethodsLoading,
     paymentMethodsError,
+    cryptoNetworks,
+    cryptoNetworksLoading,
+    cryptoNetworksError,
+    selectedCryptoNetworkId,
+    setSelectedCryptoNetworkId,
     selectedCountry,
     onOpenCountryPicker,
     quote,
@@ -1234,6 +1327,11 @@ function OrderPaymentPanel({
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
+                    cryptoNetworks={cryptoNetworks}
+                    cryptoNetworksLoading={cryptoNetworksLoading}
+                    cryptoNetworksError={cryptoNetworksError}
+                    selectedCryptoNetworkId={selectedCryptoNetworkId}
+                    setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                     selectedCountry={selectedCountry}
                     onOpenCountryPicker={onOpenCountryPicker}
                     disabled={!payable}
@@ -1276,7 +1374,21 @@ function OrderPaymentPanel({
     );
 }
 
-function PaymentMethodPicker({ paymentMethod, setPaymentMethod, methods, loading, error, selectedCountry, onOpenCountryPicker, disabled = false }) {
+function PaymentMethodPicker({
+    paymentMethod,
+    setPaymentMethod,
+    methods,
+    loading,
+    error,
+    cryptoNetworks,
+    cryptoNetworksLoading,
+    cryptoNetworksError,
+    selectedCryptoNetworkId,
+    setSelectedCryptoNetworkId,
+    selectedCountry,
+    onOpenCountryPicker,
+    disabled = false,
+}) {
     const grouped = groupedPaymentMethods(methods);
     const groupKeys = Object.keys(grouped);
     const firstAvailableGroup = groupKeys[0] || '';
@@ -1337,27 +1449,43 @@ function PaymentMethodPicker({ paymentMethod, setPaymentMethod, methods, loading
                                 </span>
                             </button>
                             {expanded[type] && (
-                                <div className="payment-method-tile-grid">
-                                    {grouped[type].map((method) => {
-                                        const active = method.key === paymentMethod;
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={method.key}
-                                                className={`payment-method-tile${active ? ' payment-method-tile--active' : ''}`}
-                                                onClick={() => selectMethod(method, type)}
-                                                aria-pressed={active}
-                                                disabled={disabled}
-                                            >
-                                                <span className="payment-method-tile-logo" aria-hidden="true">
-                                                    {methodInitials(method)}
-                                                </span>
-                                                {method.currency && <span className="currency-badge">{method.currency}</span>}
-                                                <strong>{method.name}</strong>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <>
+                                    <div className="payment-method-tile-grid">
+                                        {grouped[type].map((method) => {
+                                            const active = method.key === paymentMethod;
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={method.key}
+                                                    className={`payment-method-tile${active ? ' payment-method-tile--active' : ''}`}
+                                                    onClick={() => selectMethod(method, type)}
+                                                    aria-pressed={active}
+                                                    disabled={disabled}
+                                                >
+                                                    {method.logoUrl ? (
+                                                        <img className="payment-method-tile-image" src={method.logoUrl} alt="" />
+                                                    ) : (
+                                                        <span className="payment-method-tile-logo" aria-hidden="true">
+                                                            {methodInitials(method)}
+                                                        </span>
+                                                    )}
+                                                    {method.currency && <span className="currency-badge">{method.currency}</span>}
+                                                    <strong>{method.name}</strong>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {type === 'CRYPTO' && grouped[type].some((method) => method.key === paymentMethod) && (
+                                        <CryptoNetworkSelector
+                                            networks={cryptoNetworks}
+                                            loading={cryptoNetworksLoading}
+                                            error={cryptoNetworksError}
+                                            selectedNetworkId={selectedCryptoNetworkId}
+                                            onSelect={setSelectedCryptoNetworkId}
+                                            disabled={disabled}
+                                        />
+                                    )}
+                                </>
                             )}
                         </section>
                     ))}
@@ -1366,6 +1494,39 @@ function PaymentMethodPicker({ paymentMethod, setPaymentMethod, methods, loading
                 <div className="payment-method-empty">
                     No payment methods are available for this country yet.
                 </div>
+            )}
+        </div>
+    );
+}
+
+function CryptoNetworkSelector({ networks, loading, error, selectedNetworkId, onSelect, disabled }) {
+    return (
+        <div className="crypto-network-panel">
+            <div className="crypto-network-label">Network</div>
+            {loading && <div className="payment-method-status">Loading crypto networks...</div>}
+            {error && <div className="payment-method-status payment-method-status--error">{error.message}</div>}
+            {!loading && !error && networks?.length ? (
+                <div className="crypto-network-pills">
+                    {networks.map((network) => {
+                        const active = network.id === selectedNetworkId;
+                        return (
+                            <button
+                                key={network.id}
+                                type="button"
+                                className={`crypto-network-pill${active ? ' crypto-network-pill--active' : ''}`}
+                                onClick={() => onSelect(network.id)}
+                                disabled={disabled}
+                                aria-pressed={active}
+                            >
+                                <span className="crypto-network-dot" aria-hidden="true" />
+                                {network.displayName || network.name}
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
+            {!loading && !error && !networks?.length && (
+                <div className="payment-method-status">No crypto networks are available for this method.</div>
             )}
         </div>
     );
