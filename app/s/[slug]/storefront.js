@@ -748,6 +748,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     <OrderPaymentPanel
                         order={order}
                         buyer={buyer}
+                        setBuyer={updateBuyer}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={updatePaymentMethod}
                         paymentMethods={paymentMethods}
@@ -1155,7 +1156,6 @@ function CheckoutPaymentForm({
         sum + number(product.priceAmount) * number(quantity)
     ), 0);
     const cartCurrency = cartItems[0]?.product?.priceCurrency || currencies.billingCurrency || '';
-    const requiresPhone = selectedMethod?.type === 'MOBILE_MONEY';
 
     return (
         <section className="commerce-payment-flow" aria-label="Payment">
@@ -1220,6 +1220,8 @@ function CheckoutPaymentForm({
                 <PaymentMethodPicker
                     paymentMethod={paymentMethod}
                     setPaymentMethod={setPaymentMethod}
+                    buyer={buyer}
+                    setBuyer={setBuyer}
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
@@ -1231,10 +1233,6 @@ function CheckoutPaymentForm({
                     selectedCountry={selectedCountry}
                     onOpenCountryPicker={onOpenCountryPicker}
                 />
-
-                {requiresPhone && (
-                    <p className="payment-method-hint">Payment request goes to the buyer phone number.</p>
-                )}
 
                 <div className="actions payment-actions">
                     <button className="button primary" onClick={onConfirm} disabled={busy || !cartItems.length}>
@@ -1275,6 +1273,7 @@ function CheckoutPaymentForm({
 function OrderPaymentPanel({
     order,
     buyer,
+    setBuyer,
     paymentMethod,
     setPaymentMethod,
     paymentMethods,
@@ -1324,6 +1323,8 @@ function OrderPaymentPanel({
                 <PaymentMethodPicker
                     paymentMethod={paymentMethod}
                     setPaymentMethod={setPaymentMethod}
+                    buyer={buyer}
+                    setBuyer={setBuyer}
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
@@ -1336,10 +1337,6 @@ function OrderPaymentPanel({
                     onOpenCountryPicker={onOpenCountryPicker}
                     disabled={!payable}
                 />
-
-                {selectedMethod?.type === 'MOBILE_MONEY' && (
-                    <p className="payment-method-hint">Payment request goes to {buyer.phone || 'the buyer phone number'}.</p>
-                )}
 
                 <div className="actions payment-actions">
                     <button className="button primary" onClick={onConfirm} disabled={busy || !payable}>
@@ -1377,6 +1374,8 @@ function OrderPaymentPanel({
 function PaymentMethodPicker({
     paymentMethod,
     setPaymentMethod,
+    buyer,
+    setBuyer,
     methods,
     loading,
     error,
@@ -1411,6 +1410,13 @@ function PaymentMethodPicker({
     const selectMethod = (method, type) => {
         setPaymentMethod(method.key);
         setExpanded({ [type]: true });
+    };
+    const updatePaymentPhone = (digits) => {
+        if (!setBuyer) return;
+        setBuyer((current) => ({
+            ...current,
+            phone: combinePhoneNumber(selectedCountry, digits),
+        }));
     };
 
     return (
@@ -1485,6 +1491,14 @@ function PaymentMethodPicker({
                                             disabled={disabled}
                                         />
                                     )}
+                                    {type === 'MOBILE_MONEY' && grouped[type].some((method) => method.key === paymentMethod) && (
+                                        <MobileMoneyPhoneSelector
+                                            buyer={buyer}
+                                            selectedCountry={selectedCountry}
+                                            onChangeDigits={updatePaymentPhone}
+                                            disabled={disabled}
+                                        />
+                                    )}
                                 </>
                             )}
                         </section>
@@ -1495,6 +1509,34 @@ function PaymentMethodPicker({
                     No payment methods are available for this country yet.
                 </div>
             )}
+        </div>
+    );
+}
+
+function MobileMoneyPhoneSelector({ buyer, selectedCountry, onChangeDigits, disabled }) {
+    const localPhone = nationalPhoneNumber(buyer?.phone, selectedCountry);
+
+    return (
+        <div className="mobile-money-phone-panel">
+            <label className="mobile-money-phone-label">Mobile Money phone number</label>
+            <div className="mobile-money-phone-row">
+                <input
+                    className="mobile-money-code-input"
+                    value={`+${selectedCountry?.callingCode || '243'}`}
+                    readOnly
+                    aria-label="Country code"
+                    disabled={disabled}
+                />
+                <input
+                    className="mobile-money-number-input"
+                    type="tel"
+                    inputMode="numeric"
+                    value={localPhone}
+                    placeholder="997371767"
+                    onChange={(event) => onChangeDigits(phoneDigits(event.currentTarget.value).slice(0, 15))}
+                    disabled={disabled}
+                />
+            </div>
         </div>
     );
 }
