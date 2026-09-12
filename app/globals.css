@@ -991,6 +991,98 @@ button:disabled {
     box-shadow: 0 6px 14px rgba(79, 128, 92, 0.2);
 }
 
+.download-menu {
+    position: relative;
+    display: inline-flex;
+}
+
+.download-button {
+    gap: 8px;
+}
+
+.download-button svg {
+    flex: 0 0 auto;
+}
+
+.download-button--hero {
+    min-height: 56px;
+    padding-inline: 18px;
+    font-size: 16px;
+}
+
+.download-popover {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    z-index: 30;
+    width: min(340px, calc(100vw - 36px));
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid rgba(79, 128, 92, 0.24);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 24px 54px rgba(15, 23, 42, 0.18);
+}
+
+.landing-nav .download-popover {
+    top: calc(100% + 10px);
+    bottom: auto;
+}
+
+.download-popover-intro,
+.download-store-link {
+    grid-column: 1 / -1;
+}
+
+.download-popover-intro {
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--brand-soft);
+}
+
+.download-popover-intro strong {
+    color: var(--brand-dark);
+}
+
+.download-popover-intro p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.download-qr {
+    color: var(--ink);
+    text-align: center;
+    text-decoration: none;
+}
+
+.download-qr img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    transition: transform 160ms ease;
+}
+
+.download-qr:hover img {
+    transform: scale(1.02);
+}
+
+.download-qr span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 850;
+}
+
 .landing-hero {
     min-height: calc(100dvh - 72px);
     display: flex;
@@ -1448,6 +1540,26 @@ button:disabled {
     margin: 14px 0 0;
 }
 
+.download-points {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.download-points span {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 13px;
+    font-weight: 850;
+}
+
 @media (max-width: 860px) {
     .commerce-page {
         padding: 12px;
@@ -1574,6 +1686,19 @@ button:disabled {
     .landing-cta {
         margin-bottom: 44px;
         padding: 22px;
+    }
+
+    .landing-cta .download-menu {
+        width: 100%;
+    }
+
+    .landing-cta .download-button {
+        width: 100%;
+    }
+
+    .download-popover {
+        right: 50%;
+        transform: translateX(50%);
     }
 
     .store-logo {

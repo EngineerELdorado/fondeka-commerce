@@ -1,10 +1,12 @@
+import DownloadAppButton from './download-app-button';
+
 const landingCopy = {
     en: {
         nav: {
             platform: 'Platform',
             workflow: 'Workflow',
             faq: 'FAQ',
-            stores: 'Explore stores',
+            download: 'Download app',
         },
         seo: {
             title: 'Fondeka Commerce | SaaS Stores, POS, and Payments for African Merchants',
@@ -112,9 +114,15 @@ const landingCopy = {
         },
         cta: {
             eyebrow: 'Fondeka Commerce',
-            title: 'Bring African merchants online and in-store.',
-            text: 'Create stores, run POS, and collect payments through rails your buyers already use.',
-            button: 'Open demo storefront',
+            title: 'Download Fondeka and start selling.',
+            text: 'Create stores, run POS, collect payments, and manage money from the Fondeka app.',
+            button: 'Download Fondeka',
+            android: 'Download for Android',
+            ios: 'Download for iPhone',
+            desktopTitle: 'Scan and install Fondeka',
+            desktopBody: 'Use the app to manage commerce, payments, wallets, cards, bills, airtime, and more.',
+            desktopCta: 'Open store page',
+            points: ['Create your store', 'Sell with POS', 'Collect local payments'],
         },
     },
     fr: {
@@ -122,7 +130,7 @@ const landingCopy = {
             platform: 'Plateforme',
             workflow: 'Parcours',
             faq: 'FAQ',
-            stores: 'Voir les boutiques',
+            download: 'Télécharger',
         },
         seo: {
             title: 'Fondeka Commerce | Boutiques SaaS, POS et Paiements pour Marchands Africains',
@@ -230,9 +238,15 @@ const landingCopy = {
         },
         cta: {
             eyebrow: 'Fondeka Commerce',
-            title: 'Amener les marchands africains en ligne et en boutique.',
-            text: 'Créez des boutiques, utilisez le POS et encaissez via les rails que vos acheteurs utilisent déjà.',
-            button: 'Ouvrir la démo',
+            title: 'Téléchargez Fondeka et commencez à vendre.',
+            text: 'Créez des boutiques, utilisez le POS, encaissez et gérez votre argent depuis l’app Fondeka.',
+            button: 'Télécharger Fondeka',
+            android: 'Télécharger pour Android',
+            ios: 'Télécharger pour iPhone',
+            desktopTitle: 'Scannez et installez Fondeka',
+            desktopBody: 'Utilisez l’app pour gérer commerce, paiements, wallets, cartes, factures, airtime et plus.',
+            desktopCta: 'Ouvrir la page store',
+            points: ['Créer votre boutique', 'Vendre avec le POS', 'Encaisser localement'],
         },
     },
 };
@@ -338,7 +352,7 @@ export default async function Home({ searchParams }) {
                 </nav>
                 <div className="landing-nav-actions">
                     <LanguageSwitcher activeLocale={locale} />
-                    <a className="button primary landing-nav-action" href="#stores">{copy.nav.stores}</a>
+                    <a className="button primary landing-nav-action" href="#download">{copy.nav.download}</a>
                 </div>
             </header>
 
@@ -468,13 +482,27 @@ export default async function Home({ searchParams }) {
                 </div>
             </section>
 
-            <section className="landing-cta commerce-shell">
+            <section className="landing-cta commerce-shell" id="download">
                 <div>
                     <p className="eyebrow">{copy.cta.eyebrow}</p>
                     <h2>{copy.cta.title}</h2>
                     <p>{copy.cta.text}</p>
+                    <div className="download-points" aria-label="Download benefits">
+                        {copy.cta.points.map((point) => (
+                            <span key={point}>{point}</span>
+                        ))}
+                    </div>
                 </div>
-                <a className="button primary" href="/s/demo-store">{copy.cta.button}</a>
+                <DownloadAppButton
+                    variant="hero"
+                    label={copy.cta.button}
+                    androidLabel={copy.cta.android}
+                    iosLabel={copy.cta.ios}
+                    desktopTitle={copy.cta.desktopTitle}
+                    desktopBody={copy.cta.desktopBody}
+                    desktopCta={copy.cta.desktopCta}
+                    trackingId="commerce-download-cta"
+                />
             </section>
         </main>
     );
