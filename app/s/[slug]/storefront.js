@@ -60,6 +60,42 @@ function amount(value, currency) {
     return code ? `${formatted} ${code}` : formatted;
 }
 
+function formatPhone(value = '') {
+    const text = String(value || '');
+    if (!text.startsWith('+')) return text;
+    const digits = phoneDigits(text);
+    if (!digits) return text;
+    const country = COUNTRY_OPTIONS
+        .slice()
+        .sort((a, b) => String(b.callingCode).length - String(a.callingCode).length)
+        .find((option) => digits.startsWith(option.callingCode));
+    if (!country) return text;
+    const rest = digits.slice(country.callingCode.length).replace(/(\d{2,3})(?=\d)/g, '$1 ').trim();
+    return `+${country.callingCode}${rest ? ` ${rest}` : ''}`;
+}
+
+function parseCryptoHint(text) {
+    try {
+        const value = String(text || '');
+        const amountMatch = value.match(/send\s+([\d.]+\s*\w+)/i);
+        const networkMatch = value.match(/network\s+([\w-]+)/i);
+        return {
+            amount: amountMatch?.[1] || null,
+            network: networkMatch?.[1] || null,
+        };
+    } catch {
+        return {};
+    }
+}
+
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(String(text || ''));
+    } catch {
+        // Clipboard access can be blocked in insecure or embedded contexts.
+    }
+}
+
 function readError(error, fallback = 'Something went wrong.') {
     if (error?.payload) return error.payload;
     return {
@@ -305,6 +341,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [currencies, setCurrencies] = useState({ billingCurrency: seededCurrency, paymentCurrency: seededCurrency });
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [quote, setQuote] = useState(null);
+    const [paymentReviewOpen, setPaymentReviewOpen] = useState(false);
+    const [paymentReviewContext, setPaymentReviewContext] = useState(null);
+    const [paymentPrompt, setPaymentPrompt] = useState(null);
     const [checkout, setCheckout] = useState(null);
     const [order, setOrder] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState('');
@@ -414,6 +453,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             return next;
         });
         setQuote(null);
+        setPaymentReviewOpen(false);
+        setPaymentReviewContext(null);
+        setPaymentPrompt(null);
         setCheckout(null);
         setOrder(null);
         setDiscoveredPaymentMethods([]);
@@ -431,6 +473,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const updateBuyer = (updater) => {
         setBuyer(updater);
         setQuote(null);
+        setPaymentReviewOpen(false);
+        setPaymentReviewContext(null);
+        setPaymentPrompt(null);
         setCheckout(null);
         setFlowError(null);
     };
@@ -441,6 +486,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setCryptoNetworksError(null);
         setSelectedCryptoNetworkId(null);
         setQuote(null);
+        setPaymentReviewOpen(false);
+        setPaymentReviewContext(null);
+        setPaymentPrompt(null);
         setCheckout(null);
         setFlowError(null);
     };
@@ -533,7 +581,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         return { quote: nextQuote, order: currentOrder, method: selectedMethod };
     };
 
-    const startPayment = async () => {
+    const reviewPayment = async () => {
         const validation = validate();
         if (validation) {
             setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
@@ -544,6 +592,58 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setFlowError(null);
         try {
             const quoteResult = await fetchPaymentQuote();
+            setPaymentReviewContext(quoteResult);
+            setPaymentReviewOpen(true);
+        } catch (error) {
+            setFlowError(readError(error, 'Unable to check payment fees.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const showPaymentPrompt = (response, methodForPayment, paymentQuote) => {
+        const nextAction = response?.nextAction || response?.payment?.nextAction || response?.transaction?.nextAction || null;
+        const responseStatus = String(response?.status || response?.payment?.status || response?.transaction?.status || '').toUpperCase();
+        const actionable = !responseStatus || ['PENDING', 'REQUIRES_ACTION', 'INITIATED', 'NEW'].includes(responseStatus);
+
+        if (methodForPayment.type === 'MOBILE_MONEY' && actionable) {
+            setPaymentPrompt({
+                type: 'MOBILE_MONEY',
+                number: buyer.phone,
+                hint: nextAction?.urlOrHint || nextAction?.message || '',
+            });
+            return;
+        }
+
+        if (methodForPayment.type === 'CRYPTO' && actionable) {
+            const selectedNetwork = cryptoNetworks.find((network) => network.id === selectedCryptoNetworkId);
+            const hint = nextAction?.type || nextAction?.message || '';
+            const parsedHint = parseCryptoHint(hint);
+            const railAmount = paymentQuote.paymentAmount ?? paymentQuote.grossAmount ?? paymentQuote.totalAmount;
+            const railCurrency = paymentQuote.paymentCurrency || paymentQuote.grossAmountCurrency || paymentQuote.totalCurrency;
+            setPaymentPrompt({
+                type: 'CRYPTO',
+                address: nextAction?.urlOrHint || response?.address || response?.paymentAddress || '',
+                amount: parsedHint.amount || amount(railAmount, railCurrency),
+                networkName: parsedHint.network || selectedNetwork?.displayName || selectedNetwork?.name || '',
+                hint,
+            });
+        }
+    };
+
+    const confirmPayment = async () => {
+        const validation = validate();
+        if (validation) {
+            setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
+            return;
+        }
+
+        setBusy(true);
+        setFlowError(null);
+        try {
+            const quoteResult = paymentReviewContext?.quote && paymentReviewContext?.order && paymentReviewContext?.method
+                ? paymentReviewContext
+                : await fetchPaymentQuote();
             const currentOrder = quoteResult.order;
             const paymentQuote = quoteResult.quote;
             const methodForPayment = quoteResult.method;
@@ -567,6 +667,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     }),
                 }
             );
+            setPaymentReviewOpen(false);
+            setPaymentReviewContext(null);
+            showPaymentPrompt(paidOrder, methodForPayment, paymentQuote);
             setOrder(paidOrder);
         } catch (error) {
             setFlowError(readError(error, 'Unable to start payment.'));
@@ -714,6 +817,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 setCountryCode(country.code);
                 setShowCountryPicker(false);
                 setQuote(null);
+                setPaymentReviewOpen(false);
+                setPaymentReviewContext(null);
+                setPaymentPrompt(null);
                 setCheckout(null);
                 setDiscoveredPaymentMethods([]);
                 setPaymentMethodsError(null);
@@ -724,6 +830,34 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             }}
         />
     );
+    const reviewSheet = paymentReviewOpen ? (
+        <PaymentReviewSheet
+            quote={paymentReviewContext?.quote || quote}
+            method={paymentReviewContext?.method || selectedPaymentMethod}
+            network={selectedPaymentMethod?.type === 'CRYPTO'
+                ? cryptoNetworks.find((network) => network.id === selectedCryptoNetworkId)
+                : null}
+            account={selectedPaymentMethod?.type === 'MOBILE_MONEY' ? buyer.phone : null}
+            busy={busy}
+            onClose={() => setPaymentReviewOpen(false)}
+            onConfirm={confirmPayment}
+        />
+    ) : null;
+    const paymentPromptModal = paymentPrompt?.type === 'MOBILE_MONEY' ? (
+        <MobileMoneyPromptModal
+            number={paymentPrompt.number}
+            hint={paymentPrompt.hint}
+            onClose={() => setPaymentPrompt(null)}
+        />
+    ) : paymentPrompt?.type === 'CRYPTO' ? (
+        <CryptoPaymentModal
+            address={paymentPrompt.address}
+            amount={paymentPrompt.amount}
+            networkName={paymentPrompt.networkName}
+            hint={paymentPrompt.hint}
+            onClose={() => setPaymentPrompt(null)}
+        />
+    ) : null;
 
     if (order) {
         return (
@@ -768,9 +902,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         checkout={checkout}
                         flowError={flowError}
                         busy={busy}
-                        onConfirm={startPayment}
+                        onConfirm={reviewPayment}
                     />
                     {countryPicker}
+                    {reviewSheet}
+                    {paymentPromptModal}
 
                     <button
                         className="button secondary"
@@ -838,9 +974,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                             checkout={checkout}
                             flowError={flowError}
                             busy={busy}
-                            onConfirm={startPayment}
+                            onConfirm={reviewPayment}
                         />
                         {countryPicker}
+                        {reviewSheet}
+                        {paymentPromptModal}
                     </aside>
                 </div>
             </Screen>
@@ -908,7 +1046,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         checkout={checkout}
                         flowError={flowError}
                         busy={busy}
-                        onConfirm={startPayment}
+                        onConfirm={reviewPayment}
                     />
                 </aside>
             </div>
@@ -923,6 +1061,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 />
             )}
             {countryPicker}
+            {reviewSheet}
+            {paymentPromptModal}
         </Screen>
     );
 }
@@ -1251,21 +1391,6 @@ function CheckoutPaymentForm({
                 )}
             </section>
 
-            {quote && (
-                <section className="payment-review-panel">
-                    <div className="quote-header">
-                        <strong>Payment total</strong>
-                        {quote.expiresAt && (
-                            <span>Expires {new Date(quote.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        )}
-                    </div>
-                    <MoneySummary data={quote} />
-                    <div className="payment-review-method">
-                        <span>Payment route</span>
-                        <strong>{selectedMethod?.name || 'Payment method'}</strong>
-                    </div>
-                </section>
-            )}
         </section>
     );
 }
@@ -1355,18 +1480,6 @@ function OrderPaymentPanel({
                 )}
             </section>
 
-            {quote && (
-                <section className="payment-review-panel">
-                    <div className="quote-header">
-                        <strong>Total to pay</strong>
-                    </div>
-                    <MoneySummary data={quote} />
-                    <div className="payment-review-method">
-                        <span>Payment route</span>
-                        <strong>{selectedMethod?.name || 'Payment method'}</strong>
-                    </div>
-                </section>
-            )}
         </section>
     );
 }
@@ -1537,6 +1650,122 @@ function MobileMoneyPhoneSelector({ buyer, selectedCountry, onChangeDigits, disa
                     disabled={disabled}
                 />
             </div>
+        </div>
+    );
+}
+
+function MobileMoneyPromptModal({ number, hint, onClose }) {
+    const target = hint || formatPhone(number) || 'your phone';
+    return (
+        <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="payment-action-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="payment-action-header">
+                    <h3>Confirm on your phone</h3>
+                    <button type="button" className="payment-action-close" onClick={onClose}>Close</button>
+                </div>
+                <p className="payment-action-copy">
+                    We sent a Mobile Money payment request to <strong>{target}</strong>. Approve it on your phone to complete the order.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function CryptoPaymentModal({ address, amount, networkName, hint, onClose }) {
+    const qrSrc = address
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(address)}`
+        : '';
+
+    return (
+        <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="payment-action-modal payment-action-modal--crypto" onClick={(event) => event.stopPropagation()}>
+                <div className="payment-action-header">
+                    <h3>Send crypto payment</h3>
+                    <button type="button" className="payment-action-close" onClick={onClose}>Close</button>
+                </div>
+
+                {hint && <div className="payment-action-hint">{hint}</div>}
+
+                <div className="crypto-payment-content">
+                    <div className="crypto-payment-qr">
+                        {qrSrc ? <img src={qrSrc} alt="" /> : <span>QR unavailable</span>}
+                    </div>
+
+                    <div className="crypto-payment-details">
+                        <ReviewSummaryLine label="Amount" value={amount || '-'} highlight />
+                        <ReviewSummaryLine label="Network" value={networkName || '-'} />
+                        <div className="crypto-address-block">
+                            <span>Address</span>
+                            <code title={address}>{address || '-'}</code>
+                        </div>
+                        <button type="button" className="payment-action-copy-button" onClick={() => copyToClipboard(address)}>
+                            Copy address
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function PaymentReviewSheet({ quote, method, network, account, busy, onClose, onConfirm }) {
+    if (!quote) return null;
+    const netAmount = quote.netAmount ?? quote.billingAmount ?? quote.itemSubtotalAmount;
+    const netCurrency = quote.netAmountCurrency || quote.billingCurrency || quote.itemSubtotalCurrency || quote.totalCurrency;
+    const fees = quote.feeAmount ?? quote.fees;
+    const feeCurrency = quote.feeCurrency || quote.feesCurrency || quote.totalCurrency;
+    const total = quote.grossAmount ?? quote.totalToPay ?? quote.totalAmount ?? quote.paymentAmount ?? netAmount;
+    const totalCurrency = quote.grossAmountCurrency || quote.totalToPayCurrency || quote.totalCurrency || quote.paymentCurrency || netCurrency;
+    const railAmount = quote.paymentAmount;
+    const railCurrency = quote.paymentCurrency;
+    const showRailAmount = railAmount != null
+        && railCurrency
+        && String(railCurrency).toUpperCase() !== String(totalCurrency || '').toUpperCase();
+
+    return (
+        <div className="payment-review-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="payment-review-sheet" onClick={(event) => event.stopPropagation()}>
+                <div className="payment-review-handle" aria-hidden="true" />
+                <div className="payment-review-sheet-header">
+                    <h3>Review payment</h3>
+                    <button type="button" className="payment-review-close" onClick={onClose}>Close</button>
+                </div>
+
+                <div className="payment-review-summary">
+                    <ReviewSummaryLine label="Checkout amount" value={amount(netAmount, netCurrency)} />
+                    <ReviewSummaryLine label="Fees" value={fees != null ? amount(fees, feeCurrency) : '-'} />
+                    <ReviewSummaryLine label="Total to pay" value={amount(total, totalCurrency)} highlight />
+                    {showRailAmount && (
+                        <ReviewSummaryLine label="Rail amount" value={amount(railAmount, railCurrency)} highlight />
+                    )}
+                    {method && <ReviewSummaryLine label="Method" value={method.name} />}
+                    {network && <ReviewSummaryLine label="Network" value={network.displayName || network.name} />}
+                    {account && <ReviewSummaryLine label="Account" value={account} />}
+                </div>
+
+                <div className="payment-review-actions">
+                    <button type="button" className="payment-review-action payment-review-action--secondary" onClick={onClose}>
+                        Back
+                    </button>
+                    <button
+                        type="button"
+                        className="payment-review-action payment-review-action--primary"
+                        onClick={onConfirm}
+                        disabled={busy}
+                    >
+                        {busy ? 'Submitting...' : 'Confirm payment'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ReviewSummaryLine({ label, value, highlight = false }) {
+    return (
+        <div className={`review-summary-line${highlight ? ' review-summary-line--highlight' : ''}`}>
+            <span>{label}</span>
+            <strong>{value}</strong>
         </div>
     );
 }
