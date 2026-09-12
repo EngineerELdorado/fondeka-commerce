@@ -4,6 +4,40 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 
 const PAGE_SIZE = 20;
+const PAYMENT_METHODS = [
+    {
+        key: 'FONDEKA_BALANCE',
+        id: null,
+        name: 'Fondeka Balance',
+        type: 'BALANCE',
+        currency: '',
+        note: 'Fastest option for customers using the Fondeka app.',
+    },
+    {
+        key: 'MOBILE_MONEY',
+        id: 57,
+        name: 'Mobile Money',
+        type: 'MOBILE_MONEY',
+        currency: 'CDF',
+        note: 'Use the buyer phone number for payment follow-up.',
+    },
+    {
+        key: 'CARD',
+        id: null,
+        name: 'Card',
+        type: 'CARD',
+        currency: '',
+        note: 'Prepared for public card checkout when enabled.',
+    },
+    {
+        key: 'CRYPTO',
+        id: null,
+        name: 'Crypto',
+        type: 'CRYPTO',
+        currency: '',
+        note: 'Prepared for crypto invoice checkout when enabled.',
+    },
+];
 
 function pageItems(payload) {
     if (Array.isArray(payload)) return payload;
@@ -63,6 +97,10 @@ function firstCurrency(store, products) {
     return store?.defaultCurrency || products[0]?.priceCurrency || '';
 }
 
+function productImage(product) {
+    return product?.image1 || product?.imageUrl || product?.image2 || product?.image3 || product?.image4 || '';
+}
+
 function checkoutPayload(cartItems, buyer, currencies) {
     return {
         items: cartItems.map(({ product, quantity }) => ({
@@ -78,19 +116,64 @@ function checkoutPayload(cartItems, buyer, currencies) {
     };
 }
 
-export default function Storefront({ slug, productLookup }) {
-    const [store, setStore] = useState(null);
-    const [products, setProducts] = useState([]);
-    const [cart, setCart] = useState({});
+function cartSubtotal(cartItems) {
+    return cartItems.reduce((sum, { product, quantity }) => (
+        sum + number(product.priceAmount) * number(quantity)
+    ), 0);
+}
+
+function idempotencyKey(prefix = 'commerce-payment') {
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function feeQuotePayload(feeQuote, order, paymentMethod) {
+    const netAmount = number(feeQuote?.netAmount ?? order?.paymentAmount);
+    const netCurrency = feeQuote?.netAmountCurrency || order?.paymentCurrency || paymentMethod?.currency || '';
+    const feeAmount = number(feeQuote?.fees);
+    const feeCurrency = feeQuote?.feesCurrency || feeQuote?.grossAmountCurrency || paymentMethod?.currency || netCurrency;
+    const totalAmount = number(feeQuote?.grossAmount ?? feeQuote?.totalToPay ?? order?.paymentAmount);
+    const totalCurrency = feeQuote?.grossAmountCurrency || feeQuote?.totalToPayCurrency || paymentMethod?.currency || order?.paymentCurrency || '';
+
+    return {
+        ...feeQuote,
+        quoteSource: 'CUSTOMER_FEES',
+        action: 'COMMERCE_CHECKOUT_PAYMENT',
+        paymentMethodId: paymentMethod?.id || null,
+        paymentMethodName: paymentMethod?.name || null,
+        itemSubtotalAmount: netAmount,
+        itemSubtotalCurrency: netCurrency,
+        feeAmount,
+        feeCurrency,
+        totalAmount,
+        totalCurrency,
+        billingAmount: order?.billingAmount ?? netAmount,
+        billingCurrency: order?.billingCurrency || netCurrency,
+        paymentAmount: totalAmount,
+        paymentCurrency: totalCurrency,
+        netAmount,
+        netAmountCurrency: netCurrency,
+        grossAmount: totalAmount,
+        grossAmountCurrency: totalCurrency,
+    };
+}
+
+export default function Storefront({ slug, productLookup, productSlug, initialStore = null, initialProducts = null, initialCart = null, initialLoadError = null }) {
+    const seededProducts = Array.isArray(initialProducts) ? initialProducts : [];
+    const hasInitialState = !!initialStore || seededProducts.length > 0 || !!initialLoadError;
+    const [store, setStore] = useState(initialStore);
+    const [products, setProducts] = useState(seededProducts);
+    const [cart, setCart] = useState(initialCart || {});
     const [buyer, setBuyer] = useState({ name: '', email: '', phone: '' });
-    const [currencies, setCurrencies] = useState({ billingCurrency: '', paymentCurrency: '' });
+    const seededCurrency = firstCurrency(initialStore, seededProducts);
+    const [currencies, setCurrencies] = useState({ billingCurrency: seededCurrency, paymentCurrency: seededCurrency });
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [quote, setQuote] = useState(null);
     const [checkout, setCheckout] = useState(null);
     const [order, setOrder] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1].key);
+    const [loading, setLoading] = useState(!hasInitialState);
     const [busy, setBusy] = useState(false);
-    const [loadError, setLoadError] = useState(null);
+    const [loadError, setLoadError] = useState(initialLoadError);
     const [flowError, setFlowError] = useState(null);
 
     const load = useCallback(async () => {
@@ -101,8 +184,10 @@ export default function Storefront({ slug, productLookup }) {
             let storePayload = null;
             let loadedProducts = [];
 
-            if (productLookup) {
-                const product = await apiFetch(`/public/commerce/products/${encodeURIComponent(productLookup)}`);
+            if (productLookup || (slug && productSlug)) {
+                const product = slug && productSlug
+                    ? await apiFetch(`/public/commerce/stores/${encodeURIComponent(slug)}/products/${encodeURIComponent(productSlug)}`)
+                    : await apiFetch(`/public/commerce/products/${encodeURIComponent(productLookup)}`);
                 loadedProducts = [product];
                 if (product.storeSlug) {
                     storePayload = await apiFetch(`/public/commerce/stores/${encodeURIComponent(product.storeSlug)}`);
@@ -133,11 +218,12 @@ export default function Storefront({ slug, productLookup }) {
         } finally {
             setLoading(false);
         }
-    }, [productLookup, slug]);
+    }, [productLookup, productSlug, slug]);
 
     useEffect(() => {
+        if (hasInitialState) return;
         load();
-    }, [load]);
+    }, [hasInitialState, load]);
 
     const cartItems = useMemo(() => products
         .map((product) => ({ product, quantity: number(cart[product.id]) }))
@@ -177,11 +263,40 @@ export default function Storefront({ slug, productLookup }) {
         setFlowError(null);
     };
 
+    const updatePaymentMethod = (methodId) => {
+        setPaymentMethod(methodId);
+        setQuote(null);
+        setCheckout(null);
+        setFlowError(null);
+    };
+
     const validate = () => {
         if (!cartItems.length) return 'Choose at least one product.';
         if (!currencies.billingCurrency.trim()) return 'Billing currency is required.';
         if (!currencies.paymentCurrency.trim()) return 'Payment currency is required.';
+        if (paymentMethod === 'MOBILE_MONEY' && !buyer.phone.trim()) return 'Buyer phone is required for Mobile Money.';
+        const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod);
+        if (!selectedMethod?.id) return `${selectedMethod?.name || 'This payment method'} is not configured for web checkout yet.`;
         return null;
+    };
+
+    const ensureOrder = async () => {
+        if (order?.reference && order?.accessToken) return order;
+        const createdCheckout = await apiFetch('/public/commerce/checkouts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(checkoutPayload(cartItems, buyer, currencies)),
+        });
+        setCheckout({
+            id: createdCheckout.id,
+            accessToken: createdCheckout.accessToken,
+        });
+        const pendingOrder = await apiFetch(
+            `/public/commerce/checkouts/${encodeURIComponent(createdCheckout.id)}/orders?accessToken=${encodeURIComponent(createdCheckout.accessToken || '')}`,
+            { method: 'POST' }
+        );
+        setOrder(pendingOrder);
+        return pendingOrder;
     };
 
     const quoteCheckout = async () => {
@@ -196,46 +311,63 @@ export default function Storefront({ slug, productLookup }) {
         setCheckout(null);
         setFlowError(null);
         try {
-            const quoted = await apiFetch('/public/commerce/checkouts/quote', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(checkoutPayload(cartItems, buyer, currencies)),
+            const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
+            const currentOrder = await ensureOrder();
+            const paymentCurrency = currentOrder.paymentCurrency || currencies.paymentCurrency;
+            const displayCurrency = selectedMethod.currency || paymentCurrency;
+            const params = new URLSearchParams({
+                action: 'COMMERCE_CHECKOUT_PAYMENT',
+                paymentMethodId: String(selectedMethod.id),
+                amount: String(currentOrder.paymentAmount),
+                currency: String(paymentCurrency || '').trim().toUpperCase(),
+                displayCurrency: String(displayCurrency || '').trim().toUpperCase(),
             });
-            setQuote(quoted);
+            const feeQuote = await apiFetch(`/customer-api/fees?${params.toString()}`);
+            setQuote(feeQuotePayload(feeQuote, currentOrder, selectedMethod));
         } catch (error) {
-            setFlowError(readError(error, 'Unable to quote checkout.'));
+            setFlowError(readError(error, 'Unable to calculate payment fees.'));
         } finally {
             setBusy(false);
         }
     };
 
-    const createOrder = async () => {
+    const startPayment = async () => {
         const validation = validate();
         if (validation) {
             setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
+            return;
+        }
+        if (!quote) {
+            setFlowError({ message: 'Review the payment total before starting payment.', errorCode: 'INVALID_REQUEST' });
             return;
         }
 
         setBusy(true);
         setFlowError(null);
         try {
-            const createdCheckout = await apiFetch('/public/commerce/checkouts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(checkoutPayload(cartItems, buyer, currencies)),
-            });
-            setCheckout({
-                id: createdCheckout.id,
-                accessToken: createdCheckout.accessToken,
-            });
-            const pendingOrder = await apiFetch(
-                `/public/commerce/checkouts/${encodeURIComponent(createdCheckout.id)}/orders?accessToken=${encodeURIComponent(createdCheckout.accessToken || '')}`,
-                { method: 'POST' }
+            const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
+            const currentOrder = await ensureOrder();
+            const paidOrder = await apiFetch(
+                `/customer-api/commerce/orders/${encodeURIComponent(currentOrder.reference)}/payments/start?accessToken=${encodeURIComponent(currentOrder.accessToken || '')}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paymentMethod: {
+                            id: selectedMethod.id,
+                            type: selectedMethod.type,
+                            accountRef: selectedMethod.key === 'MOBILE_MONEY' ? buyer.phone.trim() : null,
+                            currency: selectedMethod.currency || currentOrder.paymentCurrency,
+                            networkId: null,
+                            feeApplicationMode: quote.feeApplicationMode || null,
+                        },
+                        idempotencyKey: idempotencyKey(`commerce-${currentOrder.reference}`),
+                    }),
+                }
             );
-            setOrder(pendingOrder);
-            setQuote(null);
+            setOrder(paidOrder);
         } catch (error) {
-            setFlowError(readError(error, 'Unable to create order.'));
+            setFlowError(readError(error, 'Unable to start payment.'));
         } finally {
             setBusy(false);
         }
@@ -292,8 +424,8 @@ export default function Storefront({ slug, productLookup }) {
             <Screen>
                 <section className="order-panel">
                     <div className="status-pill">{order.status || 'PENDING_PAYMENT'}</div>
-                    <h1>Order created</h1>
-                    <p>Payment is not yet available in this test version. Keep this reference for the next step.</p>
+                    <h1>Complete payment</h1>
+                    <p>Review the payment total, then start payment with the selected rail.</p>
 
                     <dl className="order-details">
                         <div>
@@ -306,14 +438,26 @@ export default function Storefront({ slug, productLookup }) {
                         </div>
                     </dl>
 
-                    <MoneySummary data={order} />
                     <PaymentHandoff order={order} />
+                    <OrderPaymentPanel
+                        order={order}
+                        buyer={buyer}
+                        paymentMethod={paymentMethod}
+                        setPaymentMethod={updatePaymentMethod}
+                        quote={quote}
+                        checkout={checkout}
+                        flowError={flowError}
+                        busy={busy}
+                        onQuote={quoteCheckout}
+                        onConfirm={startPayment}
+                    />
 
                     <button
                         className="button secondary"
                         onClick={() => {
                             setOrder(null);
                             setCheckout(null);
+                            setQuote(null);
                             setCart({});
                             setFlowError(null);
                         }}
@@ -321,6 +465,50 @@ export default function Storefront({ slug, productLookup }) {
                         Back to store
                     </button>
                 </section>
+            </Screen>
+        );
+    }
+
+    const directProduct = (productLookup || productSlug) ? products[0] : null;
+    if (directProduct) {
+        return (
+            <Screen wide>
+                <div className="product-page-layout">
+                    <ProductHero product={directProduct} store={store} />
+
+                    <aside className="checkout-panel product-checkout-panel" aria-label="Checkout">
+                        <div className="section-heading">
+                            <h2>Checkout</h2>
+                            <span>{cartCount} item{cartCount === 1 ? '' : 's'}</span>
+                        </div>
+
+                        <div className="product-quantity-row">
+                            <span>Quantity</span>
+                            <Quantity
+                                quantity={number(cart[directProduct.id])}
+                                onIncrement={() => changeQuantity(directProduct.id, 1)}
+                                onDecrement={() => changeQuantity(directProduct.id, -1)}
+                                disabled={inventoryLabel(directProduct) === 'Out of stock'}
+                            />
+                        </div>
+
+                        <CheckoutPaymentForm
+                            cartItems={cartItems}
+                            buyer={buyer}
+                            setBuyer={updateBuyer}
+                            currencies={currencies}
+                            setCurrencies={updateCurrencies}
+                            paymentMethod={paymentMethod}
+                            setPaymentMethod={updatePaymentMethod}
+                            quote={quote}
+                            checkout={checkout}
+                            flowError={flowError}
+                            busy={busy}
+                            onQuote={quoteCheckout}
+                            onConfirm={startPayment}
+                        />
+                    </aside>
+                </div>
             </Screen>
         );
     }
@@ -360,54 +548,21 @@ export default function Storefront({ slug, productLookup }) {
                         <span>{cartCount} item{cartCount === 1 ? '' : 's'}</span>
                     </div>
 
-                    {cartItems.length ? (
-                        <div className="cart-lines">
-                            {cartItems.map(({ product, quantity }) => (
-                                <div className="cart-line" key={product.id}>
-                                    <div>
-                                        <strong>{product.name}</strong>
-                                        <span>{quantity} x {amount(product.priceAmount, product.priceCurrency)}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="muted">Choose products to start a checkout.</p>
-                    )}
-
-                    <BuyerFields buyer={buyer} setBuyer={updateBuyer} />
-                    <CurrencyFields currencies={currencies} setCurrencies={updateCurrencies} />
-
-                    <div className="actions">
-                        <button className="button secondary" onClick={quoteCheckout} disabled={busy || !cartItems.length}>
-                            {busy ? 'Working...' : 'Get quote'}
-                        </button>
-                        <button className="button primary" onClick={createOrder} disabled={busy || !quote || !cartItems.length}>
-                            Confirm order
-                        </button>
-                    </div>
-
-                    {checkout && !order && (
-                        <p className="muted">Checkout {checkout.id} created. Creating order...</p>
-                    )}
-
-                    {flowError && (
-                        isFeatureDisabled(flowError)
-                            ? <Unavailable message={flowError.message} />
-                            : <InlineError message={flowError.message} />
-                    )}
-
-                    {quote && (
-                        <section className="quote-panel">
-                            <div className="quote-header">
-                                <strong>Quote ready</strong>
-                                {quote.expiresAt && (
-                                    <span>Expires {new Date(quote.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                )}
-                            </div>
-                            <MoneySummary data={quote} />
-                        </section>
-                    )}
+                    <CheckoutPaymentForm
+                        cartItems={cartItems}
+                        buyer={buyer}
+                        setBuyer={updateBuyer}
+                        currencies={currencies}
+                        setCurrencies={updateCurrencies}
+                        paymentMethod={paymentMethod}
+                        setPaymentMethod={updatePaymentMethod}
+                        quote={quote}
+                        checkout={checkout}
+                        flowError={flowError}
+                        busy={busy}
+                        onQuote={quoteCheckout}
+                        onConfirm={startPayment}
+                    />
                 </aside>
             </div>
 
@@ -421,6 +576,44 @@ export default function Storefront({ slug, productLookup }) {
                 />
             )}
         </Screen>
+    );
+}
+
+function ProductHero({ product, store }) {
+    const image = productImage(product);
+    return (
+        <section className="product-page-hero">
+            <div className="product-page-media">
+                {image ? (
+                    <img src={image} alt={product.name || ''} />
+                ) : (
+                    <div className="product-page-media-fallback">{initials(product.name)}</div>
+                )}
+            </div>
+
+            <div className="product-page-copy">
+                <div className="product-page-store">
+                    {store?.logoUrl ? (
+                        <img src={store.logoUrl} alt="" />
+                    ) : (
+                        <span>{initials(store?.name || product?.storeName)}</span>
+                    )}
+                    <div>
+                        <strong>{store?.name || product?.storeName || 'Fondeka merchant'}</strong>
+                        {store?.description && <small>{store.description}</small>}
+                    </div>
+                </div>
+
+                <p className="eyebrow">{product.type || 'Product'}</p>
+                <h1>{product.name}</h1>
+                <div className="product-page-price">{amount(product.priceAmount, product.priceCurrency)}</div>
+                {product.description && <p className="product-page-description">{product.description}</p>}
+                <div className="store-meta">
+                    <span>{inventoryLabel(product)}</span>
+                    {store?.countryCode && <span>{store.countryCode}</span>}
+                </div>
+            </div>
+        </section>
     );
 }
 
@@ -479,10 +672,11 @@ function StoreHeader({ store }) {
 
 function ProductCard({ product, quantity, onOpen, onIncrement, onDecrement }) {
     const out = inventoryLabel(product) === 'Out of stock';
+    const image = productImage(product);
     return (
         <article className="product-card">
             <button className="product-preview" onClick={onOpen} aria-label={`View ${product.name}`}>
-                {initials(product.name)}
+                {image ? <img src={image} alt="" /> : initials(product.name)}
             </button>
             <div className="product-body">
                 <button className="product-title" onClick={onOpen}>{product.name}</button>
@@ -556,6 +750,248 @@ function CurrencyFields({ currencies, setCurrencies }) {
     );
 }
 
+function CheckoutPaymentForm({
+    cartItems,
+    buyer,
+    setBuyer,
+    currencies,
+    setCurrencies,
+    paymentMethod,
+    setPaymentMethod,
+    quote,
+    checkout,
+    flowError,
+    busy,
+    onQuote,
+    onConfirm,
+}) {
+    const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
+    const cartSubtotal = cartItems.reduce((sum, { product, quantity }) => (
+        sum + number(product.priceAmount) * number(quantity)
+    ), 0);
+    const cartCurrency = currencies.billingCurrency || cartItems[0]?.product?.priceCurrency || '';
+    const requiresPhone = selectedMethod.key === 'MOBILE_MONEY';
+
+    return (
+        <section className="commerce-payment-flow" aria-label="Payment">
+            <section className="payment-step-card">
+                <div className="payment-step-heading payment-step-heading--primary">
+                    <span>1</span>
+                    <div>
+                        <strong>Order total</strong>
+                        <small>{cartItems.length ? `${cartItems.length} line item${cartItems.length === 1 ? '' : 's'}` : 'No items selected'}</small>
+                    </div>
+                </div>
+
+                {cartItems.length ? (
+                    <div className="cart-lines payment-cart-lines">
+                        {cartItems.map(({ product, quantity }) => (
+                            <div className="cart-line" key={product.id}>
+                                <div>
+                                    <strong>{product.name}</strong>
+                                    <span>{quantity} x {amount(product.priceAmount, product.priceCurrency)}</span>
+                                </div>
+                                <b>{amount(number(product.priceAmount) * number(quantity), product.priceCurrency)}</b>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="muted">Choose products to start a checkout.</p>
+                )}
+
+                <div className="commerce-payment-total">
+                    <span>Estimated subtotal</span>
+                    <strong>{amount(cartSubtotal, cartCurrency)}</strong>
+                </div>
+            </section>
+
+            <section className="payment-step-card">
+                <div className="payment-step-heading">
+                    <span>2</span>
+                    <div>
+                        <strong>Buyer details</strong>
+                        <small>Used for confirmation and payment follow-up</small>
+                    </div>
+                </div>
+                <BuyerFields buyer={buyer} setBuyer={setBuyer} />
+                <CurrencyFields currencies={currencies} setCurrencies={setCurrencies} />
+            </section>
+
+            <section className="payment-step-card">
+                <div className="payment-step-heading">
+                    <span>3</span>
+                    <div>
+                        <strong>How to pay</strong>
+                        <small>Select the route the buyer expects to use</small>
+                    </div>
+                </div>
+
+                <div className="payment-method-grid">
+                    {PAYMENT_METHODS.map((method) => {
+                        const active = method.key === paymentMethod;
+                        return (
+                            <button
+                                type="button"
+                                key={method.key}
+                                className={`payment-method-option${active ? ' payment-method-option--active' : ''}`}
+                                onClick={() => setPaymentMethod(method.key)}
+                                aria-pressed={active}
+                            >
+                                <span>{method.currency || method.type}</span>
+                                <strong>{method.name}</strong>
+                                <small>{method.note}</small>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {requiresPhone && (
+                    <p className="payment-method-hint">
+                        Mobile Money will use the buyer phone number above. Add it before requesting the quote.
+                    </p>
+                )}
+
+                <div className="actions payment-actions">
+                    <button className="button secondary" onClick={onQuote} disabled={busy || !cartItems.length}>
+                        {busy ? 'Working...' : quote ? 'Refresh total' : 'Review payment'}
+                    </button>
+                    <button className="button primary" onClick={onConfirm} disabled={busy || !quote || !cartItems.length}>
+                        Start payment
+                    </button>
+                </div>
+
+                {checkout && (
+                    <p className="muted">Checkout {checkout.id} created. Creating order...</p>
+                )}
+
+                {flowError && (
+                    isFeatureDisabled(flowError)
+                        ? <Unavailable message={flowError.message} />
+                        : <InlineError message={flowError.message} />
+                )}
+            </section>
+
+            {quote && (
+                <section className="payment-review-panel">
+                    <div className="quote-header">
+                        <strong>Payment total</strong>
+                        {quote.expiresAt && (
+                            <span>Expires {new Date(quote.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        )}
+                    </div>
+                    <MoneySummary data={quote} />
+                    <div className="payment-review-method">
+                        <span>Payment route</span>
+                        <strong>{selectedMethod.name}</strong>
+                    </div>
+                </section>
+            )}
+        </section>
+    );
+}
+
+function OrderPaymentPanel({
+    order,
+    buyer,
+    paymentMethod,
+    setPaymentMethod,
+    quote,
+    checkout,
+    flowError,
+    busy,
+    onQuote,
+    onConfirm,
+}) {
+    const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
+    const status = String(order?.status || '').toUpperCase();
+    const payable = !status || status === 'PENDING_PAYMENT';
+
+    return (
+        <section className="commerce-payment-flow" aria-label="Order payment">
+            <section className="payment-step-card">
+                <div className="payment-step-heading payment-step-heading--primary">
+                    <span>1</span>
+                    <div>
+                        <strong>Checkout amount</strong>
+                        <small>Amount before Fondeka payment fees</small>
+                    </div>
+                </div>
+                <div className="commerce-payment-total commerce-payment-total--plain">
+                    <span>Amount to fund</span>
+                    <strong>{amount(order.paymentAmount, order.paymentCurrency)}</strong>
+                </div>
+            </section>
+
+            <section className="payment-step-card">
+                <div className="payment-step-heading">
+                    <span>2</span>
+                    <div>
+                        <strong>Payment rail</strong>
+                        <small>Fees are configured separately for commerce checkout payments</small>
+                    </div>
+                </div>
+                <div className="payment-method-grid">
+                    {PAYMENT_METHODS.map((method) => {
+                        const active = method.key === paymentMethod;
+                        return (
+                            <button
+                                type="button"
+                                key={method.key}
+                                className={`payment-method-option${active ? ' payment-method-option--active' : ''}`}
+                                onClick={() => setPaymentMethod(method.key)}
+                                aria-pressed={active}
+                                disabled={!payable}
+                            >
+                                <span>{method.currency || method.type}</span>
+                                <strong>{method.name}</strong>
+                                <small>{method.id ? method.note : 'Not configured for web checkout yet.'}</small>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {selectedMethod.key === 'MOBILE_MONEY' && (
+                    <p className="payment-method-hint">
+                        Payment request will be sent to {buyer.phone || 'the buyer phone number'}.
+                    </p>
+                )}
+
+                <div className="actions payment-actions">
+                    <button className="button secondary" onClick={onQuote} disabled={busy || !payable}>
+                        {busy ? 'Working...' : quote ? 'Refresh total' : 'Review payment'}
+                    </button>
+                    <button className="button primary" onClick={onConfirm} disabled={busy || !quote || !payable}>
+                        Start payment
+                    </button>
+                </div>
+
+                {checkout && (
+                    <p className="muted">Checkout {checkout.id} is linked to this order.</p>
+                )}
+
+                {flowError && (
+                    isFeatureDisabled(flowError)
+                        ? <Unavailable message={flowError.message} />
+                        : <InlineError message={flowError.message} />
+                )}
+            </section>
+
+            {quote && (
+                <section className="payment-review-panel">
+                    <div className="quote-header">
+                        <strong>Total to pay</strong>
+                    </div>
+                    <MoneySummary data={quote} />
+                    <div className="payment-review-method">
+                        <span>Payment route</span>
+                        <strong>{selectedMethod.name}</strong>
+                    </div>
+                </section>
+            )}
+        </section>
+    );
+}
+
 function InlineError({ message }) {
     return <div className="inline-error">{message}</div>;
 }
@@ -573,16 +1009,16 @@ function MoneySummary({ data }) {
     return (
         <div className="money-summary">
             <div>
-                <span>Checkout subtotal</span>
-                <strong>{amount(data.itemSubtotalAmount, data.itemSubtotalCurrency)}</strong>
+                <span>Checkout amount</span>
+                <strong>{amount(data.netAmount ?? data.itemSubtotalAmount, data.netAmountCurrency ?? data.itemSubtotalCurrency)}</strong>
             </div>
             <div>
                 <span>Fee</span>
                 <strong>{amount(data.feeAmount, data.feeCurrency)}</strong>
             </div>
             <div className="money-total">
-                <span>Buyer total</span>
-                <strong>{amount(data.totalAmount, data.totalCurrency)}</strong>
+                <span>Total to pay</span>
+                <strong>{amount(data.grossAmount ?? data.totalAmount, data.grossAmountCurrency ?? data.totalCurrency)}</strong>
             </div>
             <div>
                 <span>Billing amount</span>

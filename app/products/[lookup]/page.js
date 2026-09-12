@@ -3,7 +3,7 @@ import Storefront from '../../s/[slug]/storefront';
 export async function generateMetadata({ params }) {
     const resolvedParams = await params;
     return {
-        title: `${resolvedParams.lookup} | Fondeka Commerce`,
+        title: resolvedParams.lookup,
     };
 }
 
