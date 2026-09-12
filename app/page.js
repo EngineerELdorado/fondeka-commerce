@@ -1,27 +1,23 @@
 const storefrontFeatures = [
     {
-        title: 'Store links',
-        text: 'Branded URLs for every merchant.',
+        title: 'Store creation',
+        text: 'Launch a branded storefront without building an ecommerce stack.',
     },
     {
-        title: 'Product cards',
-        text: 'Photos, prices, stock, and details.',
+        title: 'POS',
+        text: 'Create in-person orders and collect payments from the same commerce flow.',
     },
     {
-        title: 'Checkout',
-        text: 'Cart, buyer details, fees, and payment.',
-    },
-    {
-        title: 'Order tracking',
-        text: 'Structured orders ready for fulfillment.',
+        title: 'Built-in payments',
+        text: 'Mobile money, wallet rails, fee lookup, and checkout payments.',
     },
 ];
 
 const workflow = [
-    'Publish catalog',
-    'Share store link',
-    'Collect checkout',
-    'Fulfill order',
+    'Create store',
+    'Publish products',
+    'Sell online or in person',
+    'Track paid orders',
 ];
 
 const audiences = [
@@ -36,11 +32,11 @@ const audiences = [
 const faqs = [
     {
         question: 'What is Fondeka Commerce?',
-        answer: 'A hosted storefront and checkout layer for Fondeka merchants.',
+        answer: 'A commerce operating system for African merchants.',
     },
     {
         question: 'Who is Fondeka Commerce for?',
-        answer: 'Retailers, service sellers, digital merchants, and diaspora shops.',
+        answer: 'Retailers, market vendors, service sellers, and diaspora shops.',
     },
     {
         question: 'What can customers do?',
@@ -123,9 +119,9 @@ export default function Home() {
                 <div className="commerce-shell landing-hero-grid">
                     <div className="landing-hero-copy">
                         <p className="eyebrow">SaaS commerce storefronts by Fondeka</p>
-                        <h1>Online storefronts for Fondeka merchants.</h1>
+                        <h1>Storefronts for Fondeka merchants.</h1>
                         <p className="hero-lede">
-                            Products, checkout, payment fees, and order follow-up in one shareable store link.
+                            Store creation, POS, and African payment rails in one commerce layer.
                         </p>
                         <div className="hero-actions" id="stores">
                             <a className="button primary" href="/s/demo-store">View a storefront</a>
@@ -133,16 +129,16 @@ export default function Home() {
                         </div>
                         <dl className="hero-proof" aria-label="Fondeka Commerce platform highlights">
                             <div>
-                                <dt>Storefront</dt>
-                                <dd>Public merchant URLs</dd>
+                                <dt>Store creation</dt>
+                                <dd>Launch branded stores</dd>
                             </div>
                             <div>
-                                <dt>Catalog</dt>
-                                <dd>Products, prices, availability</dd>
+                                <dt>POS</dt>
+                                <dd>Sell in person</dd>
                             </div>
                             <div>
-                                <dt>Orders</dt>
-                                <dd>Buyer details and cart totals</dd>
+                                <dt>Payments</dt>
+                                <dd>Built-in payment rails</dd>
                             </div>
                         </dl>
                     </div>
@@ -162,19 +158,19 @@ export default function Home() {
                         </div>
                         <div className="preview-grid">
                             <article>
-                                <span>Catalog</span>
-                                <strong>Product catalog</strong>
-                                <p>Items ready to browse.</p>
+                                <span>Create</span>
+                                <strong>Store creation</strong>
+                                <p>Brand, products, checkout.</p>
+                            </article>
+                            <article>
+                                <span>Sell</span>
+                                <strong>POS</strong>
+                                <p>Counter orders and payments.</p>
                             </article>
                             <article>
                                 <span>Pay</span>
-                                <strong>Cart and checkout</strong>
-                                <p>Total, fees, payment rail.</p>
-                            </article>
-                            <article>
-                                <span>Track</span>
-                                <strong>Order handoff</strong>
-                                <p>Status and fulfillment.</p>
+                                <strong>Built-in payments</strong>
+                                <p>Mobile money, wallet rails, fees.</p>
                             </article>
                         </div>
                     </div>
@@ -184,8 +180,8 @@ export default function Home() {
             <section className="landing-section commerce-shell" id="platform">
                 <div className="section-kicker">Platform</div>
                 <div className="section-intro">
-                    <h2>Everything a store link needs.</h2>
-                    <p>Lightweight, mobile-first, and built around real merchant workflows.</p>
+                    <h2>Commerce built for African realities.</h2>
+                    <p>Stores, POS, and payment rails that fit how merchants already sell.</p>
                 </div>
                 <div className="feature-grid">
                     {storefrontFeatures.map((feature) => (
@@ -201,7 +197,7 @@ export default function Home() {
                 <div className="commerce-shell split-section">
                     <div>
                         <div className="section-kicker">Workflow</div>
-                        <h2>From catalog to paid order.</h2>
+                        <h2>From market stall to paid order.</h2>
                         <div className="flow-preview" aria-label="Commerce checkout preview">
                             <div><span>Subtotal</span><strong>85 USD</strong></div>
                             <div><span>Fees</span><strong>2.40 USD</strong></div>
@@ -219,8 +215,8 @@ export default function Home() {
             <section className="landing-section commerce-shell">
                 <div className="section-kicker">Use cases</div>
                 <div className="section-intro">
-                    <h2>For merchants who sell where customers already are.</h2>
-                    <p>Social links, referrals, repeat buyers, and marketplace-style product drops.</p>
+                    <h2>For merchants who sell online, offline, and across borders.</h2>
+                    <p>Market stalls, WhatsApp leads, diaspora buyers, repeat customers, and walk-in sales.</p>
                 </div>
                 <div className="audience-grid">
                     {audiences.map((audience) => (
@@ -233,7 +229,7 @@ export default function Home() {
                 <div className="commerce-shell commerce-system">
                     <div>
                         <div className="section-kicker">Inside the flow</div>
-                        <h2>Less typing. More signal.</h2>
+                        <h2>Local rails. Modern checkout.</h2>
                     </div>
                     <div className="system-board" aria-label="Fondeka Commerce flow">
                         <div className="system-column">
@@ -267,8 +263,8 @@ export default function Home() {
             <section className="landing-cta commerce-shell">
                 <div>
                     <p className="eyebrow">Fondeka Commerce</p>
-                    <h2>Give every merchant a clean online storefront.</h2>
-                    <p>Publish products. Share the link. Collect paid orders.</p>
+                    <h2>Bring African merchants online and in-store.</h2>
+                    <p>Create stores, run POS, and collect payments.</p>
                 </div>
                 <a className="button primary" href="/s/demo-store">Open demo storefront</a>
             </section>
