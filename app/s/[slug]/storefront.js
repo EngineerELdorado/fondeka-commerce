@@ -4,44 +4,44 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 
 const PAGE_SIZE = 20;
-const PAYMENT_METHODS = [
-    {
-        key: 'FONDEKA_BALANCE',
-        id: null,
-        name: 'Fondeka Balance',
-        type: 'BALANCE',
-        currency: '',
-        note: 'Fastest option for customers using the Fondeka app.',
-    },
-    {
-        key: 'MOBILE_MONEY',
-        id: 57,
-        name: 'Mobile Money',
-        type: 'MOBILE_MONEY',
-        currency: 'CDF',
-        note: 'Use the buyer phone number for payment follow-up.',
-    },
-    {
-        key: 'CARD',
-        id: null,
-        name: 'Card',
-        type: 'CARD',
-        currency: '',
-        note: 'Prepared for public card checkout when enabled.',
-    },
-    {
-        key: 'CRYPTO',
-        id: null,
-        name: 'Crypto',
-        type: 'CRYPTO',
-        currency: '',
-        note: 'Prepared for crypto invoice checkout when enabled.',
-    },
+const BUYER_DETAILS_STORAGE_KEY = 'fondeka-commerce-buyer-details';
+const COUNTRY_OPTIONS = [
+    { code: 'CD', name: 'Congo', callingCode: '243', flag: '🇨🇩' },
+    { code: 'CG', name: 'Congo (Brazza)', callingCode: '242', flag: '🇨🇬' },
+    { code: 'CM', name: 'Cameroon', callingCode: '237', flag: '🇨🇲' },
+    { code: 'RW', name: 'Rwanda', callingCode: '250', flag: '🇷🇼' },
+    { code: 'BI', name: 'Burundi', callingCode: '257', flag: '🇧🇮' },
+    { code: 'KE', name: 'Kenya', callingCode: '254', flag: '🇰🇪' },
+    { code: 'TZ', name: 'Tanzania', callingCode: '255', flag: '🇹🇿' },
+    { code: 'UG', name: 'Uganda', callingCode: '256', flag: '🇺🇬' },
+    { code: 'ZM', name: 'Zambia', callingCode: '260', flag: '🇿🇲' },
+    { code: 'ZW', name: 'Zimbabwe', callingCode: '263', flag: '🇿🇼' },
+    { code: 'GA', name: 'Gabon', callingCode: '241', flag: '🇬🇦' },
+    { code: 'AO', name: 'Angola', callingCode: '244', flag: '🇦🇴' },
+    { code: 'FR', name: 'France', callingCode: '33', flag: '🇫🇷' },
+    { code: 'LU', name: 'Luxembourg', callingCode: '352', flag: '🇱🇺' },
+    { code: 'US', name: 'United States', callingCode: '1', flag: '🇺🇸' },
 ];
+const COUNTRIES_BY_CODE = COUNTRY_OPTIONS.reduce((acc, country) => {
+    acc[country.code] = country;
+    return acc;
+}, {});
+const PAYMENT_GROUP_ORDER = ['MOBILE_MONEY', 'CRYPTO', 'CARD', 'BANK_TRANSFER', 'WALLET', 'BALANCE', 'OTHER'];
+const PAYMENT_TYPE_LABELS = {
+    MOBILE_MONEY: 'Mobile money',
+    CRYPTO: 'Crypto',
+    CARD: 'Cards',
+    BANK_TRANSFER: 'Bank transfer',
+    WALLET: 'Wallet',
+    BALANCE: 'Wallet',
+    OTHER: 'Other',
+};
 
 function pageItems(payload) {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.content)) return payload.content;
+    if (Array.isArray(payload?.methods)) return payload.methods;
+    if (Array.isArray(payload?.paymentMethods)) return payload.paymentMethods;
     return [];
 }
 
@@ -86,6 +86,114 @@ function initials(text) {
         .join('') || 'S';
 }
 
+function methodInitials(method) {
+    return String(method?.name || method?.type || 'Pay')
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('') || 'PM';
+}
+
+function normalizeCountryCode(value) {
+    const code = String(value || '').trim().toUpperCase();
+    return COUNTRIES_BY_CODE[code] ? code : 'CD';
+}
+
+function detectBrowserCountry() {
+    if (typeof navigator === 'undefined') return 'CD';
+    const locales = Array.isArray(navigator.languages) && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language];
+    for (const locale of locales) {
+        const region = String(locale || '').split('-')[1];
+        if (region && COUNTRIES_BY_CODE[region.toUpperCase()]) {
+            return region.toUpperCase();
+        }
+    }
+    return 'CD';
+}
+
+function groupedPaymentMethods(methods) {
+    const groups = methods.reduce((acc, method) => {
+        const type = method.type || 'OTHER';
+        (acc[type] ||= []).push(method);
+        return acc;
+    }, {});
+    const ordered = {};
+    PAYMENT_GROUP_ORDER.forEach((type) => {
+        if (groups[type]?.length) ordered[type] = groups[type];
+    });
+    Object.keys(groups).forEach((type) => {
+        if (!ordered[type]) ordered[type] = groups[type];
+    });
+    return ordered;
+}
+
+function hasBuyerDetails(buyer) {
+    return !!(buyer?.name?.trim() || buyer?.email?.trim() || buyer?.phone?.trim());
+}
+
+function readStoredBuyerDetails() {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = window.localStorage.getItem(BUYER_DETAILS_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return {
+            name: String(parsed?.name || ''),
+            email: String(parsed?.email || ''),
+            phone: String(parsed?.phone || ''),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function storeBuyerDetails(buyer) {
+    if (typeof window === 'undefined') return;
+    try {
+        if (!hasBuyerDetails(buyer)) {
+            window.localStorage.removeItem(BUYER_DETAILS_STORAGE_KEY);
+            return;
+        }
+        window.localStorage.setItem(BUYER_DETAILS_STORAGE_KEY, JSON.stringify({
+            name: String(buyer?.name || ''),
+            email: String(buyer?.email || ''),
+            phone: String(buyer?.phone || ''),
+        }));
+    } catch {
+        // Local storage can be unavailable in private browsing or blocked contexts.
+    }
+}
+
+function phoneDigits(value) {
+    return String(value || '').replace(/\D+/g, '');
+}
+
+function nationalPhoneNumber(phone, country) {
+    let digits = phoneDigits(phone);
+    if (!digits) return '';
+
+    const selectedCallingCode = String(country?.callingCode || '').trim();
+    if (selectedCallingCode && digits.startsWith(selectedCallingCode)) {
+        return digits.slice(selectedCallingCode.length);
+    }
+
+    const matchedCode = COUNTRY_OPTIONS
+        .map((option) => String(option.callingCode || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length)
+        .find((code) => digits.startsWith(code));
+
+    return matchedCode ? digits.slice(matchedCode.length) : digits;
+}
+
+function combinePhoneNumber(country, localDigits) {
+    const digits = phoneDigits(localDigits);
+    const callingCode = String(country?.callingCode || '243').trim();
+    return digits ? `+${callingCode}${digits}` : '';
+}
+
 function inventoryLabel(product) {
     if (String(product?.inventoryPolicy || '').toUpperCase() !== 'TRACKED') return 'Available';
     const quantity = number(product?.inventoryQuantity);
@@ -126,9 +234,25 @@ function idempotencyKey(prefix = 'commerce-payment') {
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function normalizePaymentMethod(method) {
+    const id = method?.id ?? method?.paymentMethodId ?? null;
+    const type = String(method?.type || method?.paymentMethodType || method?.methodType || 'OTHER').toUpperCase();
+    const name = method?.displayName || method?.name || method?.label || method?.paymentMethodName || type;
+    return {
+        ...method,
+        key: id != null ? String(id) : String(method?.key || name || type),
+        id,
+        name,
+        type,
+        currency: method?.currency || method?.paymentCurrency || method?.displayCurrency || '',
+        logoUrl: method?.logoUrl || method?.imageUrl || '',
+        showCurrencyBadge: method?.showCurrencyBadge,
+    };
+}
+
 function feeQuotePayload(feeQuote, order, paymentMethod) {
-    const netAmount = number(feeQuote?.netAmount ?? order?.paymentAmount);
-    const netCurrency = feeQuote?.netAmountCurrency || order?.paymentCurrency || paymentMethod?.currency || '';
+    const netAmount = number(feeQuote?.netAmount ?? order?.billingAmount ?? order?.paymentAmount);
+    const netCurrency = feeQuote?.netAmountCurrency || order?.billingCurrency || order?.paymentCurrency || paymentMethod?.currency || '';
     const feeAmount = number(feeQuote?.fees);
     const feeCurrency = feeQuote?.feesCurrency || feeQuote?.grossAmountCurrency || paymentMethod?.currency || netCurrency;
     const totalAmount = number(feeQuote?.grossAmount ?? feeQuote?.totalToPay ?? order?.paymentAmount);
@@ -146,10 +270,10 @@ function feeQuotePayload(feeQuote, order, paymentMethod) {
         feeCurrency,
         totalAmount,
         totalCurrency,
-        billingAmount: order?.billingAmount ?? netAmount,
-        billingCurrency: order?.billingCurrency || netCurrency,
-        paymentAmount: totalAmount,
-        paymentCurrency: totalCurrency,
+        billingAmount: order?.billingAmount ?? order?.paymentAmount ?? netAmount,
+        billingCurrency: order?.billingCurrency || order?.paymentCurrency || netCurrency,
+        paymentAmount: feeQuote?.paymentAmount ?? totalAmount,
+        paymentCurrency: feeQuote?.paymentCurrency || totalCurrency,
         netAmount,
         netAmountCurrency: netCurrency,
         grossAmount: totalAmount,
@@ -157,20 +281,29 @@ function feeQuotePayload(feeQuote, order, paymentMethod) {
     };
 }
 
-export default function Storefront({ slug, productLookup, productSlug, initialStore = null, initialProducts = null, initialCart = null, initialLoadError = null }) {
+export default function Storefront({ slug, productLookup, productSlug, initialStore = null, initialProducts = null, initialCart = null, initialLoadError = null, initialCountry = 'CD' }) {
     const seededProducts = Array.isArray(initialProducts) ? initialProducts : [];
     const hasInitialState = !!initialStore || seededProducts.length > 0 || !!initialLoadError;
     const [store, setStore] = useState(initialStore);
     const [products, setProducts] = useState(seededProducts);
     const [cart, setCart] = useState(initialCart || {});
     const [buyer, setBuyer] = useState({ name: '', email: '', phone: '' });
+    const [buyerDetailsLoaded, setBuyerDetailsLoaded] = useState(false);
+    const [buyerDetailsOpen, setBuyerDetailsOpen] = useState(true);
     const seededCurrency = firstCurrency(initialStore, seededProducts);
     const [currencies, setCurrencies] = useState({ billingCurrency: seededCurrency, paymentCurrency: seededCurrency });
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [quote, setQuote] = useState(null);
     const [checkout, setCheckout] = useState(null);
     const [order, setOrder] = useState(null);
-    const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1].key);
+    const [paymentMethod, setPaymentMethod] = useState('');
+    const [discoveredPaymentMethods, setDiscoveredPaymentMethods] = useState([]);
+    const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
+    const [paymentMethodsError, setPaymentMethodsError] = useState(null);
+    const [countryCode, setCountryCode] = useState(() => normalizeCountryCode(initialCountry));
+    const [showCountryPicker, setShowCountryPicker] = useState(false);
+    const [countryQuery, setCountryQuery] = useState('');
+    const [userSelectedCountry, setUserSelectedCountry] = useState(false);
     const [loading, setLoading] = useState(!hasInitialState);
     const [busy, setBusy] = useState(false);
     const [loadError, setLoadError] = useState(initialLoadError);
@@ -225,11 +358,36 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         load();
     }, [hasInitialState, load]);
 
+    useEffect(() => {
+        const storedBuyer = readStoredBuyerDetails();
+        if (storedBuyer && hasBuyerDetails(storedBuyer)) {
+            setBuyer(storedBuyer);
+            setBuyerDetailsOpen(false);
+        }
+        setBuyerDetailsLoaded(true);
+    }, []);
+
+    useEffect(() => {
+        if (!buyerDetailsLoaded) return;
+        storeBuyerDetails(buyer);
+    }, [buyer, buyerDetailsLoaded]);
+
     const cartItems = useMemo(() => products
         .map((product) => ({ product, quantity: number(cart[product.id]) }))
         .filter((item) => item.quantity > 0), [cart, products]);
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const paymentMethods = discoveredPaymentMethods;
+    const selectedCountry = COUNTRIES_BY_CODE[countryCode] || COUNTRIES_BY_CODE.CD;
+    const filteredCountries = useMemo(() => {
+        const query = countryQuery.trim().toLowerCase();
+        if (!query) return COUNTRY_OPTIONS;
+        return COUNTRY_OPTIONS.filter((country) => (
+            country.name.toLowerCase().includes(query) ||
+            country.code.toLowerCase().includes(query) ||
+            country.callingCode.includes(query)
+        ));
+    }, [countryQuery]);
 
     const setQuantity = (productId, nextQuantity) => {
         const safeQuantity = Math.max(0, Math.floor(number(nextQuantity)));
@@ -242,6 +400,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setQuote(null);
         setCheckout(null);
         setOrder(null);
+        setDiscoveredPaymentMethods([]);
+        setPaymentMethodsError(null);
         setFlowError(null);
     };
 
@@ -256,15 +416,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setFlowError(null);
     };
 
-    const updateCurrencies = (updater) => {
-        setCurrencies(updater);
-        setQuote(null);
-        setCheckout(null);
-        setFlowError(null);
-    };
-
-    const updatePaymentMethod = (methodId) => {
-        setPaymentMethod(methodId);
+    const updatePaymentMethod = (methodKey) => {
+        setPaymentMethod(String(methodKey || ''));
         setQuote(null);
         setCheckout(null);
         setFlowError(null);
@@ -274,9 +427,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         if (!cartItems.length) return 'Choose at least one product.';
         if (!currencies.billingCurrency.trim()) return 'Billing currency is required.';
         if (!currencies.paymentCurrency.trim()) return 'Payment currency is required.';
-        if (paymentMethod === 'MOBILE_MONEY' && !buyer.phone.trim()) return 'Buyer phone is required for Mobile Money.';
-        const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod);
+        const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
         if (!selectedMethod?.id) return `${selectedMethod?.name || 'This payment method'} is not configured for web checkout yet.`;
+        if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return 'Buyer phone is required for Mobile Money.';
         return null;
     };
 
@@ -299,36 +452,62 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         return pendingOrder;
     };
 
-    const quoteCheckout = async () => {
-        const validation = validate();
-        if (validation) {
-            setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
-            return;
-        }
-
-        setBusy(true);
-        setQuote(null);
-        setCheckout(null);
-        setFlowError(null);
+    const fetchPaymentMethodsForAmount = useCallback(async ({ amount: methodAmount, currency: methodCurrency }) => {
+        const params = new URLSearchParams({
+            action: 'COMMERCE_CHECKOUT_PAYMENT',
+            amount: String(methodAmount ?? 0),
+            currency: String(methodCurrency || '').trim().toUpperCase(),
+            countryCode,
+        });
+        setPaymentMethodsLoading(true);
+        setPaymentMethodsError(null);
         try {
-            const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
-            const currentOrder = await ensureOrder();
-            const paymentCurrency = currentOrder.paymentCurrency || currencies.paymentCurrency;
-            const displayCurrency = selectedMethod.currency || paymentCurrency;
-            const params = new URLSearchParams({
-                action: 'COMMERCE_CHECKOUT_PAYMENT',
-                paymentMethodId: String(selectedMethod.id),
-                amount: String(currentOrder.paymentAmount),
-                currency: String(paymentCurrency || '').trim().toUpperCase(),
-                displayCurrency: String(displayCurrency || '').trim().toUpperCase(),
-            });
-            const feeQuote = await apiFetch(`/customer-api/fees?${params.toString()}`);
-            setQuote(feeQuotePayload(feeQuote, currentOrder, selectedMethod));
+            const payload = await apiFetch(`/public/payment-methods?${params.toString()}`);
+            const list = pageItems(payload).map(normalizePaymentMethod).filter((method) => method.id);
+            setDiscoveredPaymentMethods(list);
+            if (paymentMethod && !list.some((method) => method.key === paymentMethod)) setPaymentMethod('');
+            return list;
         } catch (error) {
-            setFlowError(readError(error, 'Unable to calculate payment fees.'));
+            const normalizedError = readError(error, 'Unable to load payment methods.');
+            setPaymentMethodsError(normalizedError);
+            throw error;
         } finally {
-            setBusy(false);
+            setPaymentMethodsLoading(false);
         }
+    }, [countryCode, paymentMethod]);
+
+    const fetchPaymentMethods = useCallback(async (currentOrder) => fetchPaymentMethodsForAmount({
+        amount: currentOrder.paymentAmount ?? currentOrder.billingAmount ?? 0,
+        currency: currentOrder.paymentCurrency || currentOrder.billingCurrency || '',
+    }), [fetchPaymentMethodsForAmount]);
+
+    const resolveSelectedPaymentMethod = async (currentOrder) => {
+        const methods = await fetchPaymentMethods(currentOrder);
+        const selectedMethod = methods.find((method) => method.key === paymentMethod);
+        if (!selectedMethod?.id) {
+            throw new Error('No payment method is available for this checkout.');
+        }
+        return selectedMethod;
+    };
+
+    const fetchPaymentQuote = async ({ resetCheckout = false } = {}) => {
+        const currentOrder = await ensureOrder();
+        const selectedMethod = await resolveSelectedPaymentMethod(currentOrder);
+        const settlementAmount = currentOrder.billingAmount ?? currentOrder.paymentAmount;
+        const settlementCurrency = currentOrder.billingCurrency || currentOrder.paymentCurrency || currencies.billingCurrency;
+        const displayCurrency = selectedMethod.currency || currentOrder.paymentCurrency || settlementCurrency;
+        const params = new URLSearchParams({
+            action: 'COMMERCE_CHECKOUT_PAYMENT',
+            paymentMethodId: String(selectedMethod.id),
+            amount: String(settlementAmount),
+            currency: String(settlementCurrency || '').trim().toUpperCase(),
+            displayCurrency: String(displayCurrency || '').trim().toUpperCase(),
+        });
+        const feeQuote = await apiFetch(`/public/fees?${params.toString()}`);
+        const nextQuote = feeQuotePayload(feeQuote, currentOrder, selectedMethod);
+        if (resetCheckout) setCheckout(null);
+        setQuote(nextQuote);
+        return { quote: nextQuote, order: currentOrder, method: selectedMethod };
     };
 
     const startPayment = async () => {
@@ -337,29 +516,29 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
             return;
         }
-        if (!quote) {
-            setFlowError({ message: 'Review the payment total before starting payment.', errorCode: 'INVALID_REQUEST' });
-            return;
-        }
 
         setBusy(true);
         setFlowError(null);
         try {
-            const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
-            const currentOrder = await ensureOrder();
+            const quoteResult = await fetchPaymentQuote();
+            const currentOrder = quoteResult.order;
+            const paymentQuote = quoteResult.quote;
+            const methodForPayment = quoteResult.method;
             const paidOrder = await apiFetch(
-                `/customer-api/commerce/orders/${encodeURIComponent(currentOrder.reference)}/payments/start?accessToken=${encodeURIComponent(currentOrder.accessToken || '')}`,
+                `/public/commerce/orders/${encodeURIComponent(currentOrder.reference)}/payments/start?accessToken=${encodeURIComponent(currentOrder.accessToken || '')}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        paymentMethodId: methodForPayment.id,
+                        accountNumber: methodForPayment.type === 'MOBILE_MONEY' ? buyer.phone.trim() : null,
+                        networkId: methodForPayment.networkId || null,
+                        amount: paymentQuote.paymentAmount ?? paymentQuote.grossAmount ?? currentOrder.billingAmount ?? currentOrder.paymentAmount,
+                        currency: paymentQuote.paymentCurrency || paymentQuote.grossAmountCurrency || currentOrder.billingCurrency || currentOrder.paymentCurrency,
                         paymentMethod: {
-                            id: selectedMethod.id,
-                            type: selectedMethod.type,
-                            accountRef: selectedMethod.key === 'MOBILE_MONEY' ? buyer.phone.trim() : null,
-                            currency: selectedMethod.currency || currentOrder.paymentCurrency,
-                            networkId: null,
-                            feeApplicationMode: quote.feeApplicationMode || null,
+                            id: methodForPayment.id,
+                            type: methodForPayment.type,
+                            currency: methodForPayment.currency || currentOrder.paymentCurrency,
                         },
                         idempotencyKey: idempotencyKey(`commerce-${currentOrder.reference}`),
                     }),
@@ -372,6 +551,42 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             setBusy(false);
         }
     };
+
+    useEffect(() => {
+        if (userSelectedCountry) return;
+        setCountryCode(normalizeCountryCode(initialCountry || detectBrowserCountry()));
+    }, [initialCountry, userSelectedCountry]);
+
+    useEffect(() => {
+        if (paymentMethod && !paymentMethods.some((method) => method.key === paymentMethod)) setPaymentMethod('');
+    }, [paymentMethod, paymentMethods]);
+
+    useEffect(() => {
+        if (!cartItems.length) {
+            setDiscoveredPaymentMethods([]);
+            setPaymentMethodsError(null);
+            return undefined;
+        }
+
+        const discoveryAmount = cartSubtotal(cartItems);
+        const discoveryCurrency = cartItems[0]?.product?.priceCurrency || currencies.paymentCurrency || currencies.billingCurrency || '';
+        if (!discoveryAmount || !discoveryCurrency) return undefined;
+
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            fetchPaymentMethodsForAmount({ amount: discoveryAmount, currency: discoveryCurrency })
+                .catch(() => {
+                    if (!cancelled) {
+                        // The visible error state is set in fetchPaymentMethodsForAmount.
+                    }
+                });
+        }, 150);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [cartItems, currencies.billingCurrency, currencies.paymentCurrency, fetchPaymentMethodsForAmount]);
 
     useEffect(() => {
         if (!order?.reference || !order?.accessToken) return undefined;
@@ -419,13 +634,41 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         );
     }
 
+    const countryPicker = (
+        <CountryPickerModal
+            open={showCountryPicker}
+            countries={filteredCountries}
+            query={countryQuery}
+            selectedCode={countryCode}
+            onQueryChange={setCountryQuery}
+            onClose={() => setShowCountryPicker(false)}
+            onSelect={(country) => {
+                setUserSelectedCountry(true);
+                setBuyer((current) => {
+                    const localDigits = nationalPhoneNumber(current.phone, selectedCountry);
+                    return {
+                        ...current,
+                        phone: localDigits ? combinePhoneNumber(country, localDigits) : current.phone,
+                    };
+                });
+                setCountryCode(country.code);
+                setShowCountryPicker(false);
+                setQuote(null);
+                setCheckout(null);
+                setDiscoveredPaymentMethods([]);
+                setPaymentMethodsError(null);
+                setFlowError(null);
+            }}
+        />
+    );
+
     if (order) {
         return (
             <Screen>
                 <section className="order-panel">
                     <div className="status-pill">{order.status || 'PENDING_PAYMENT'}</div>
                     <h1>Complete payment</h1>
-                    <p>Review the payment total, then start payment with the selected rail.</p>
+                    <p>Fees are checked before payment starts.</p>
 
                     <dl className="order-details">
                         <div>
@@ -444,13 +687,21 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         buyer={buyer}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={updatePaymentMethod}
+                        paymentMethods={paymentMethods}
+                        paymentMethodsLoading={paymentMethodsLoading}
+                        paymentMethodsError={paymentMethodsError}
+                        selectedCountry={selectedCountry}
+                        onOpenCountryPicker={() => {
+                            setCountryQuery('');
+                            setShowCountryPicker(true);
+                        }}
                         quote={quote}
                         checkout={checkout}
                         flowError={flowError}
                         busy={busy}
-                        onQuote={quoteCheckout}
                         onConfirm={startPayment}
                     />
+                    {countryPicker}
 
                     <button
                         className="button secondary"
@@ -497,16 +748,25 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                             buyer={buyer}
                             setBuyer={updateBuyer}
                             currencies={currencies}
-                            setCurrencies={updateCurrencies}
                             paymentMethod={paymentMethod}
                             setPaymentMethod={updatePaymentMethod}
+                            paymentMethods={paymentMethods}
+                            paymentMethodsLoading={paymentMethodsLoading}
+                            paymentMethodsError={paymentMethodsError}
+                            selectedCountry={selectedCountry}
+                            buyerDetailsOpen={buyerDetailsOpen}
+                            setBuyerDetailsOpen={setBuyerDetailsOpen}
+                            onOpenCountryPicker={() => {
+                                setCountryQuery('');
+                                setShowCountryPicker(true);
+                            }}
                             quote={quote}
                             checkout={checkout}
                             flowError={flowError}
                             busy={busy}
-                            onQuote={quoteCheckout}
                             onConfirm={startPayment}
                         />
+                        {countryPicker}
                     </aside>
                 </div>
             </Screen>
@@ -553,14 +813,22 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         buyer={buyer}
                         setBuyer={updateBuyer}
                         currencies={currencies}
-                        setCurrencies={updateCurrencies}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={updatePaymentMethod}
+                        paymentMethods={paymentMethods}
+                        paymentMethodsLoading={paymentMethodsLoading}
+                        paymentMethodsError={paymentMethodsError}
+                        selectedCountry={selectedCountry}
+                        buyerDetailsOpen={buyerDetailsOpen}
+                        setBuyerDetailsOpen={setBuyerDetailsOpen}
+                        onOpenCountryPicker={() => {
+                            setCountryQuery('');
+                            setShowCountryPicker(true);
+                        }}
                         quote={quote}
                         checkout={checkout}
                         flowError={flowError}
                         busy={busy}
-                        onQuote={quoteCheckout}
                         onConfirm={startPayment}
                     />
                 </aside>
@@ -575,6 +843,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     onDecrement={() => changeQuantity(selectedProduct.id, -1)}
                 />
             )}
+            {countryPicker}
         </Screen>
     );
 }
@@ -701,8 +970,18 @@ function Quantity({ quantity, onIncrement, onDecrement, disabled }) {
     );
 }
 
-function BuyerFields({ buyer, setBuyer }) {
+function ChevronDownIcon({ className = 'payment-country-chevron' }) {
+    return (
+        <svg className={className} width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker }) {
     const update = (key, value) => setBuyer((current) => ({ ...current, [key]: value }));
+    const localPhone = nationalPhoneNumber(buyer.phone, selectedCountry);
+
     return (
         <div className="buyer-fields">
             <label>
@@ -715,37 +994,55 @@ function BuyerFields({ buyer, setBuyer }) {
             </label>
             <label>
                 <span>Phone</span>
-                <input value={buyer.phone} onChange={(event) => update('phone', event.target.value)} placeholder="+243..." inputMode="tel" />
+                <div className="phone-input-row">
+                    <button type="button" className="phone-code-button" onClick={onOpenCountryPicker}>
+                        <span aria-hidden="true">{selectedCountry?.flag}</span>
+                        <strong>+{selectedCountry?.callingCode || '243'}</strong>
+                        <ChevronDownIcon />
+                    </button>
+                    <input
+                        value={localPhone}
+                        onChange={(event) => update('phone', combinePhoneNumber(selectedCountry, event.target.value))}
+                        placeholder="997371767"
+                        inputMode="tel"
+                    />
+                </div>
             </label>
         </div>
     );
 }
 
-function CurrencyFields({ currencies, setCurrencies }) {
-    const update = (key, value) => {
-        setCurrencies((current) => ({ ...current, [key]: value.toUpperCase().slice(0, 16) }));
-    };
+function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, onOpenCountryPicker }) {
+    const hasDetails = hasBuyerDetails(buyer);
+
+    if (!open && hasDetails) {
+        return (
+            <div className="buyer-summary">
+                <div className="buyer-summary-main">
+                    <strong>{buyer.name || 'Buyer'}</strong>
+                    <span>{buyer.phone || 'No phone saved'}</span>
+                    {buyer.email && <span>{buyer.email}</span>}
+                </div>
+                <button type="button" className="buyer-summary-edit" onClick={() => setOpen(true)}>
+                    Edit
+                </button>
+            </div>
+        );
+    }
 
     return (
-        <div className="buyer-fields currency-fields">
-            <label>
-                <span>Billing currency</span>
-                <input
-                    value={currencies.billingCurrency}
-                    onChange={(event) => update('billingCurrency', event.target.value)}
-                    placeholder="USD"
-                    autoCapitalize="characters"
-                />
-            </label>
-            <label>
-                <span>Payment currency</span>
-                <input
-                    value={currencies.paymentCurrency}
-                    onChange={(event) => update('paymentCurrency', event.target.value)}
-                    placeholder="CDF"
-                    autoCapitalize="characters"
-                />
-            </label>
+        <div>
+            <BuyerFields
+                buyer={buyer}
+                setBuyer={setBuyer}
+                selectedCountry={selectedCountry}
+                onOpenCountryPicker={onOpenCountryPicker}
+            />
+            {hasDetails && (
+                <button type="button" className="buyer-collapse-button" onClick={() => setOpen(false)}>
+                    Use these details
+                </button>
+            )}
         </div>
     );
 }
@@ -755,22 +1052,27 @@ function CheckoutPaymentForm({
     buyer,
     setBuyer,
     currencies,
-    setCurrencies,
     paymentMethod,
     setPaymentMethod,
+    paymentMethods,
+    paymentMethodsLoading,
+    paymentMethodsError,
+    selectedCountry,
+    buyerDetailsOpen,
+    setBuyerDetailsOpen,
+    onOpenCountryPicker,
     quote,
     checkout,
     flowError,
     busy,
-    onQuote,
     onConfirm,
 }) {
-    const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
+    const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
     const cartSubtotal = cartItems.reduce((sum, { product, quantity }) => (
         sum + number(product.priceAmount) * number(quantity)
     ), 0);
-    const cartCurrency = currencies.billingCurrency || cartItems[0]?.product?.priceCurrency || '';
-    const requiresPhone = selectedMethod.key === 'MOBILE_MONEY';
+    const cartCurrency = cartItems[0]?.product?.priceCurrency || currencies.billingCurrency || '';
+    const requiresPhone = selectedMethod?.type === 'MOBILE_MONEY';
 
     return (
         <section className="commerce-payment-flow" aria-label="Payment">
@@ -813,8 +1115,14 @@ function CheckoutPaymentForm({
                         <small>Used for confirmation and payment follow-up</small>
                     </div>
                 </div>
-                <BuyerFields buyer={buyer} setBuyer={setBuyer} />
-                <CurrencyFields currencies={currencies} setCurrencies={setCurrencies} />
+                <BuyerDetailsSection
+                    buyer={buyer}
+                    setBuyer={setBuyer}
+                    selectedCountry={selectedCountry}
+                    open={buyerDetailsOpen}
+                    setOpen={setBuyerDetailsOpen}
+                    onOpenCountryPicker={onOpenCountryPicker}
+                />
             </section>
 
             <section className="payment-step-card">
@@ -822,41 +1130,27 @@ function CheckoutPaymentForm({
                     <span>3</span>
                     <div>
                         <strong>How to pay</strong>
-                        <small>Select the route the buyer expects to use</small>
+                        <small>Fees are checked before payment starts</small>
                     </div>
                 </div>
 
-                <div className="payment-method-grid">
-                    {PAYMENT_METHODS.map((method) => {
-                        const active = method.key === paymentMethod;
-                        return (
-                            <button
-                                type="button"
-                                key={method.key}
-                                className={`payment-method-option${active ? ' payment-method-option--active' : ''}`}
-                                onClick={() => setPaymentMethod(method.key)}
-                                aria-pressed={active}
-                            >
-                                <span>{method.currency || method.type}</span>
-                                <strong>{method.name}</strong>
-                                <small>{method.note}</small>
-                            </button>
-                        );
-                    })}
-                </div>
+                <PaymentMethodPicker
+                    paymentMethod={paymentMethod}
+                    setPaymentMethod={setPaymentMethod}
+                    methods={paymentMethods}
+                    loading={paymentMethodsLoading}
+                    error={paymentMethodsError}
+                    selectedCountry={selectedCountry}
+                    onOpenCountryPicker={onOpenCountryPicker}
+                />
 
                 {requiresPhone && (
-                    <p className="payment-method-hint">
-                        Mobile Money will use the buyer phone number above. Add it before requesting the quote.
-                    </p>
+                    <p className="payment-method-hint">Payment request goes to the buyer phone number.</p>
                 )}
 
                 <div className="actions payment-actions">
-                    <button className="button secondary" onClick={onQuote} disabled={busy || !cartItems.length}>
-                        {busy ? 'Working...' : quote ? 'Refresh total' : 'Review payment'}
-                    </button>
-                    <button className="button primary" onClick={onConfirm} disabled={busy || !quote || !cartItems.length}>
-                        Start payment
+                    <button className="button primary" onClick={onConfirm} disabled={busy || !cartItems.length}>
+                        {busy ? 'Working...' : 'Start payment'}
                     </button>
                 </div>
 
@@ -882,7 +1176,7 @@ function CheckoutPaymentForm({
                     <MoneySummary data={quote} />
                     <div className="payment-review-method">
                         <span>Payment route</span>
-                        <strong>{selectedMethod.name}</strong>
+                        <strong>{selectedMethod?.name || 'Payment method'}</strong>
                     </div>
                 </section>
             )}
@@ -895,14 +1189,18 @@ function OrderPaymentPanel({
     buyer,
     paymentMethod,
     setPaymentMethod,
+    paymentMethods,
+    paymentMethodsLoading,
+    paymentMethodsError,
+    selectedCountry,
+    onOpenCountryPicker,
     quote,
     checkout,
     flowError,
     busy,
-    onQuote,
     onConfirm,
 }) {
-    const selectedMethod = PAYMENT_METHODS.find((method) => method.key === paymentMethod) || PAYMENT_METHODS[1];
+    const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
     const status = String(order?.status || '').toUpperCase();
     const payable = !status || status === 'PENDING_PAYMENT';
 
@@ -926,42 +1224,28 @@ function OrderPaymentPanel({
                 <div className="payment-step-heading">
                     <span>2</span>
                     <div>
-                        <strong>Payment rail</strong>
-                        <small>Fees are configured separately for commerce checkout payments</small>
+                        <strong>Payment method</strong>
+                        <small>Fees are checked before payment starts</small>
                     </div>
                 </div>
-                <div className="payment-method-grid">
-                    {PAYMENT_METHODS.map((method) => {
-                        const active = method.key === paymentMethod;
-                        return (
-                            <button
-                                type="button"
-                                key={method.key}
-                                className={`payment-method-option${active ? ' payment-method-option--active' : ''}`}
-                                onClick={() => setPaymentMethod(method.key)}
-                                aria-pressed={active}
-                                disabled={!payable}
-                            >
-                                <span>{method.currency || method.type}</span>
-                                <strong>{method.name}</strong>
-                                <small>{method.id ? method.note : 'Not configured for web checkout yet.'}</small>
-                            </button>
-                        );
-                    })}
-                </div>
+                <PaymentMethodPicker
+                    paymentMethod={paymentMethod}
+                    setPaymentMethod={setPaymentMethod}
+                    methods={paymentMethods}
+                    loading={paymentMethodsLoading}
+                    error={paymentMethodsError}
+                    selectedCountry={selectedCountry}
+                    onOpenCountryPicker={onOpenCountryPicker}
+                    disabled={!payable}
+                />
 
-                {selectedMethod.key === 'MOBILE_MONEY' && (
-                    <p className="payment-method-hint">
-                        Payment request will be sent to {buyer.phone || 'the buyer phone number'}.
-                    </p>
+                {selectedMethod?.type === 'MOBILE_MONEY' && (
+                    <p className="payment-method-hint">Payment request goes to {buyer.phone || 'the buyer phone number'}.</p>
                 )}
 
                 <div className="actions payment-actions">
-                    <button className="button secondary" onClick={onQuote} disabled={busy || !payable}>
-                        {busy ? 'Working...' : quote ? 'Refresh total' : 'Review payment'}
-                    </button>
-                    <button className="button primary" onClick={onConfirm} disabled={busy || !quote || !payable}>
-                        Start payment
+                    <button className="button primary" onClick={onConfirm} disabled={busy || !payable}>
+                        {busy ? 'Working...' : 'Start payment'}
                     </button>
                 </div>
 
@@ -984,11 +1268,153 @@ function OrderPaymentPanel({
                     <MoneySummary data={quote} />
                     <div className="payment-review-method">
                         <span>Payment route</span>
-                        <strong>{selectedMethod.name}</strong>
+                        <strong>{selectedMethod?.name || 'Payment method'}</strong>
                     </div>
                 </section>
             )}
         </section>
+    );
+}
+
+function PaymentMethodPicker({ paymentMethod, setPaymentMethod, methods, loading, error, selectedCountry, onOpenCountryPicker, disabled = false }) {
+    const grouped = groupedPaymentMethods(methods);
+    const groupKeys = Object.keys(grouped);
+    const firstAvailableGroup = groupKeys[0] || '';
+    const groupSignature = groupKeys.join('|');
+
+    const [expanded, setExpanded] = useState({});
+
+    useEffect(() => {
+        if (!firstAvailableGroup) {
+            setExpanded({});
+            return;
+        }
+        setExpanded({ [firstAvailableGroup]: true });
+    }, [firstAvailableGroup, groupSignature, selectedCountry?.code]);
+
+    const toggleGroup = (type) => {
+        setExpanded((current) => ({ [type]: !current[type] }));
+    };
+
+    const selectMethod = (method, type) => {
+        setPaymentMethod(method.key);
+        setExpanded({ [type]: true });
+    };
+
+    return (
+        <div className="payment-method-focus">
+            <div className="payment-methods-heading">
+                <span>Pay with</span>
+                <button
+                    type="button"
+                    className="payment-country-chip"
+                    onClick={onOpenCountryPicker}
+                    disabled={disabled}
+                >
+                    <span aria-hidden="true">{selectedCountry?.flag}</span>
+                    <strong>{selectedCountry?.name || selectedCountry?.code || 'Country'}</strong>
+                    <ChevronDownIcon />
+                </button>
+            </div>
+
+            {loading && <div className="payment-method-status">Loading payment methods...</div>}
+            {error && <div className="payment-method-status payment-method-status--error">{error.message}</div>}
+
+            {groupKeys.length ? (
+                <div className="payment-method-list">
+                    {groupKeys.map((type) => (
+                        <section className="payment-method-accordion" key={type}>
+                            <button
+                                type="button"
+                                className={`payment-method-accordion-header${expanded[type] ? ' payment-method-accordion-header--open' : ''}`}
+                                onClick={() => toggleGroup(type)}
+                                aria-expanded={!!expanded[type]}
+                                disabled={disabled}
+                            >
+                                <span>{PAYMENT_TYPE_LABELS[type] || type}</span>
+                                <span className="payment-method-accordion-icon" aria-hidden="true">
+                                    <ChevronDownIcon className="payment-method-chevron" />
+                                </span>
+                            </button>
+                            {expanded[type] && (
+                                <div className="payment-method-tile-grid">
+                                    {grouped[type].map((method) => {
+                                        const active = method.key === paymentMethod;
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={method.key}
+                                                className={`payment-method-tile${active ? ' payment-method-tile--active' : ''}`}
+                                                onClick={() => selectMethod(method, type)}
+                                                aria-pressed={active}
+                                                disabled={disabled}
+                                            >
+                                                <span className="payment-method-tile-logo" aria-hidden="true">
+                                                    {methodInitials(method)}
+                                                </span>
+                                                {method.currency && <span className="currency-badge">{method.currency}</span>}
+                                                <strong>{method.name}</strong>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+                    ))}
+                </div>
+            ) : (
+                <div className="payment-method-empty">
+                    No payment methods are available for this country yet.
+                </div>
+            )}
+        </div>
+    );
+}
+
+function CountryPickerModal({ open, countries, query, selectedCode, onQueryChange, onClose, onSelect }) {
+    if (!open) return null;
+
+    return (
+        <div className="country-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="country-sheet" onClick={(event) => event.stopPropagation()}>
+                <div className="country-sheet-handle" aria-hidden="true" />
+                <div className="country-sheet-header">
+                    <h3>Choose country</h3>
+                    <button type="button" className="country-sheet-close" onClick={onClose}>Close</button>
+                </div>
+                <div className="country-search-wrap">
+                    <input
+                        className="country-search-input"
+                        value={query}
+                        onChange={(event) => onQueryChange(event.currentTarget.value)}
+                        placeholder="Search country"
+                    />
+                </div>
+                <div className="country-list">
+                    {countries.map((country) => {
+                        const selected = country.code === selectedCode;
+                        return (
+                            <button
+                                type="button"
+                                key={country.code}
+                                className={`country-row${selected ? ' country-row--selected' : ''}`}
+                                onClick={() => onSelect(country)}
+                            >
+                                <span className="country-row-flag" aria-hidden="true">{country.flag}</span>
+                                <span className="country-row-main">
+                                    <span className="country-row-name">{country.name}</span>
+                                    <span className="country-row-meta">{country.code} · +{country.callingCode}</span>
+                                </span>
+                                <span className="country-row-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+                            </button>
+                        );
+                    })}
+                    {!countries.length && (
+                        <div className="country-empty-state">No countries found.</div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
 

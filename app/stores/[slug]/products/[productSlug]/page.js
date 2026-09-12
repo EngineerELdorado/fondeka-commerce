@@ -1,5 +1,7 @@
 import Storefront from '../../../../s/[slug]/storefront';
 import { apiFetch } from '../../../../../lib/api';
+import { headers } from 'next/headers';
+import { countryFromHeaders } from '../../../../../lib/request-country';
 
 function readError(error) {
     if (error?.payload) return error.payload;
@@ -22,6 +24,8 @@ export async function generateMetadata({ params }) {
 
 export default async function Page({ params }) {
     const resolvedParams = await params;
+    const hdr = await headers();
+    const initialCountry = countryFromHeaders(hdr);
     try {
         const product = await apiFetch(
             `/public/commerce/stores/${encodeURIComponent(resolvedParams.slug)}/products/${encodeURIComponent(resolvedParams.productSlug)}`
@@ -41,6 +45,7 @@ export default async function Page({ params }) {
                 initialStore={store}
                 initialProducts={product ? [product] : []}
                 initialCart={product?.id ? { [product.id]: 1 } : {}}
+                initialCountry={initialCountry}
             />
         );
     } catch (error) {
@@ -49,6 +54,7 @@ export default async function Page({ params }) {
                 slug={resolvedParams.slug}
                 productSlug={resolvedParams.productSlug}
                 initialLoadError={readError(error)}
+                initialCountry={initialCountry}
             />
         );
     }

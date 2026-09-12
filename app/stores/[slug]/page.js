@@ -1,4 +1,6 @@
 import Storefront from '../../s/[slug]/storefront';
+import { headers } from 'next/headers';
+import { countryFromHeaders } from '../../../lib/request-country';
 
 export async function generateMetadata({ params }) {
     const resolvedParams = await params;
@@ -12,5 +14,6 @@ export async function generateMetadata({ params }) {
 
 export default async function Page({ params }) {
     const resolvedParams = await params;
-    return <Storefront slug={resolvedParams.slug} />;
+    const hdr = await headers();
+    return <Storefront slug={resolvedParams.slug} initialCountry={countryFromHeaders(hdr)} />;
 }
