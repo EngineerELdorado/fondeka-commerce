@@ -88,6 +88,27 @@ function parseCryptoHint(text) {
     }
 }
 
+function formatCryptoPaymentAmount(details, fallback) {
+    const value = details?.amountInCrypto ?? details?.cryptoAmount ?? details?.amount;
+    const currency = details?.cryptoCurrency || details?.currency || '';
+    if (value == null || value === '') return fallback || '';
+    const numeric = Number(value);
+    const formatted = Number.isFinite(numeric)
+        ? numeric.toLocaleString(undefined, { maximumFractionDigits: 8 })
+        : String(value);
+    return currency ? `${formatted} ${currency}` : formatted;
+}
+
+function formatExpiry(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+}
+
 async function copyToClipboard(text) {
     try {
         await navigator.clipboard.writeText(String(text || ''));
@@ -111,6 +132,20 @@ function isFeatureDisabled(error) {
 
 function isNotFound(error) {
     return error?.errorCode === 'NO_RESULT' || error?.statusCode === 404;
+}
+
+function isOrderPaid(order) {
+    const orderStatus = String(order?.status || '').toUpperCase();
+    const paymentStatus = String(order?.paymentTransactionStatus || '').toUpperCase();
+    return orderStatus === 'PAID' || paymentStatus === 'COMPLETED' || paymentStatus === 'PAID';
+}
+
+function isOrderTerminal(order) {
+    const orderStatus = String(order?.status || '').toUpperCase();
+    const paymentStatus = String(order?.paymentTransactionStatus || '').toUpperCase();
+    return isOrderPaid(order) ||
+        ['FAILED', 'CANCELED', 'CANCELLED'].includes(orderStatus) ||
+        ['FAILED', 'CANCELED', 'CANCELLED'].includes(paymentStatus);
 }
 
 function initials(text) {
@@ -237,8 +272,8 @@ function inventoryLabel(product) {
     return `${amount(quantity, '')} available`;
 }
 
-function firstCurrency(store, products) {
-    return store?.defaultCurrency || products[0]?.priceCurrency || '';
+function firstCurrency(products) {
+    return products.find((product) => product?.priceCurrency)?.priceCurrency || '';
 }
 
 function productImage(product) {
@@ -246,13 +281,17 @@ function productImage(product) {
 }
 
 function checkoutPayload(cartItems, buyer, currencies) {
+    const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
+    const billingCurrency = cartCurrency || currencies.billingCurrency;
+    const paymentCurrency = cartCurrency || currencies.paymentCurrency || billingCurrency;
+
     return {
         items: cartItems.map(({ product, quantity }) => ({
             productId: product.id,
             quantity,
         })),
-        billingCurrency: currencies.billingCurrency.trim().toUpperCase(),
-        paymentCurrency: currencies.paymentCurrency.trim().toUpperCase(),
+        billingCurrency: billingCurrency.trim().toUpperCase(),
+        paymentCurrency: paymentCurrency.trim().toUpperCase(),
         channel: 'STOREFRONT',
         buyerName: buyer.name.trim(),
         buyerEmail: buyer.email.trim(),
@@ -337,7 +376,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [buyer, setBuyer] = useState({ name: '', email: '', phone: '' });
     const [buyerDetailsLoaded, setBuyerDetailsLoaded] = useState(false);
     const [buyerDetailsOpen, setBuyerDetailsOpen] = useState(true);
-    const seededCurrency = firstCurrency(initialStore, seededProducts);
+    const seededCurrency = firstCurrency(seededProducts);
     const [currencies, setCurrencies] = useState({ billingCurrency: seededCurrency, paymentCurrency: seededCurrency });
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [quote, setQuote] = useState(null);
@@ -346,10 +385,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [paymentPrompt, setPaymentPrompt] = useState(null);
     const [checkout, setCheckout] = useState(null);
     const [order, setOrder] = useState(null);
+    const [showOrderPaymentView, setShowOrderPaymentView] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('');
     const [discoveredPaymentMethods, setDiscoveredPaymentMethods] = useState([]);
     const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
     const [paymentMethodsError, setPaymentMethodsError] = useState(null);
+    const [paymentMethodsLoaded, setPaymentMethodsLoaded] = useState(false);
     const [cryptoNetworks, setCryptoNetworks] = useState([]);
     const [cryptoNetworksLoading, setCryptoNetworksLoading] = useState(false);
     const [cryptoNetworksError, setCryptoNetworksError] = useState(null);
@@ -382,7 +423,6 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     storePayload = {
                         name: 'Fondeka merchant',
                         slug: product.storeSlug || '',
-                        defaultCurrency: product.priceCurrency || '',
                     };
                 }
                 setCart({ [product.id]: 1 });
@@ -395,7 +435,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
             setStore(storePayload);
             setProducts(loadedProducts);
-            const defaultCurrency = firstCurrency(storePayload, loadedProducts);
+            const defaultCurrency = firstCurrency(loadedProducts);
             setCurrencies((current) => ({
                 billingCurrency: current.billingCurrency || defaultCurrency,
                 paymentCurrency: current.paymentCurrency || defaultCurrency,
@@ -458,8 +498,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentPrompt(null);
         setCheckout(null);
         setOrder(null);
-        setDiscoveredPaymentMethods([]);
-        setPaymentMethodsError(null);
+        setShowOrderPaymentView(false);
         setCryptoNetworks([]);
         setCryptoNetworksError(null);
         setSelectedCryptoNetworkId(null);
@@ -477,6 +516,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
+        setShowOrderPaymentView(false);
         setFlowError(null);
     };
 
@@ -490,13 +530,15 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
+        setShowOrderPaymentView(false);
         setFlowError(null);
     };
 
     const validate = () => {
         if (!cartItems.length) return 'Choose at least one product.';
-        if (!currencies.billingCurrency.trim()) return 'Billing currency is required.';
-        if (!currencies.paymentCurrency.trim()) return 'Payment currency is required.';
+        const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
+        if (!cartCurrency && !currencies.billingCurrency.trim()) return 'Billing currency is required.';
+        if (!cartCurrency && !currencies.paymentCurrency.trim()) return 'Payment currency is required.';
         const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
         if (!selectedMethod?.id) return `${selectedMethod?.name || 'This payment method'} is not configured for web checkout yet.`;
         if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return 'Buyer phone is required for Mobile Money.';
@@ -536,16 +578,20 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             const payload = await apiFetch(`/public/payment-methods?${params.toString()}`);
             const list = pageItems(payload).map(normalizePaymentMethod).filter((method) => method.id);
             setDiscoveredPaymentMethods(list);
-            if (paymentMethod && !list.some((method) => method.key === paymentMethod)) setPaymentMethod('');
+            setPaymentMethod((current) => (
+                current && !list.some((method) => method.key === current) ? '' : current
+            ));
+            setPaymentMethodsLoaded(true);
             return list;
         } catch (error) {
             const normalizedError = readError(error, 'Unable to load payment methods.');
             setPaymentMethodsError(normalizedError);
+            setPaymentMethodsLoaded(true);
             throw error;
         } finally {
             setPaymentMethodsLoading(false);
         }
-    }, [countryCode, paymentMethod]);
+    }, [countryCode]);
 
     const fetchPaymentMethods = useCallback(async (currentOrder) => fetchPaymentMethodsForAmount({
         amount: currentOrder.paymentAmount ?? currentOrder.billingAmount ?? 0,
@@ -603,8 +649,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
     const showPaymentPrompt = (response, methodForPayment, paymentQuote) => {
         const nextAction = response?.nextAction || response?.payment?.nextAction || response?.transaction?.nextAction || null;
-        const responseStatus = String(response?.status || response?.payment?.status || response?.transaction?.status || '').toUpperCase();
-        const actionable = !responseStatus || ['PENDING', 'REQUIRES_ACTION', 'INITIATED', 'NEW'].includes(responseStatus);
+        const responseStatus = String(
+            response?.paymentTransactionStatus ||
+            response?.status ||
+            response?.payment?.status ||
+            response?.transaction?.status ||
+            ''
+        ).toUpperCase();
+        const actionable = !responseStatus || ['PENDING', 'PENDING_PAYMENT', 'PROCESSING', 'REQUIRES_ACTION', 'INITIATED', 'NEW'].includes(responseStatus);
 
         if (methodForPayment.type === 'MOBILE_MONEY' && actionable) {
             setPaymentPrompt({
@@ -617,15 +669,18 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
         if (methodForPayment.type === 'CRYPTO' && actionable) {
             const selectedNetwork = cryptoNetworks.find((network) => network.id === selectedCryptoNetworkId);
+            const details = response?.cryptoDetails || response?.payment?.cryptoDetails || response?.transaction?.cryptoDetails || null;
             const hint = nextAction?.type || nextAction?.message || '';
             const parsedHint = parseCryptoHint(hint);
             const railAmount = paymentQuote.paymentAmount ?? paymentQuote.grossAmount ?? paymentQuote.totalAmount;
             const railCurrency = paymentQuote.paymentCurrency || paymentQuote.grossAmountCurrency || paymentQuote.totalCurrency;
             setPaymentPrompt({
                 type: 'CRYPTO',
-                address: nextAction?.urlOrHint || response?.address || response?.paymentAddress || '',
-                amount: parsedHint.amount || amount(railAmount, railCurrency),
-                networkName: parsedHint.network || selectedNetwork?.displayName || selectedNetwork?.name || '',
+                address: details?.address || response?.address || response?.paymentAddress || '',
+                amount: formatCryptoPaymentAmount(details, parsedHint.amount || amount(railAmount, railCurrency)),
+                networkName: details?.network || parsedHint.network || selectedNetwork?.displayName || selectedNetwork?.name || '',
+                invoiceUrl: details?.invoiceUrl || nextAction?.urlOrHint || '',
+                expiresAt: details?.expiresAt || '',
                 hint,
             });
         }
@@ -647,6 +702,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             const currentOrder = quoteResult.order;
             const paymentQuote = quoteResult.quote;
             const methodForPayment = quoteResult.method;
+            const accountNumber = methodForPayment.type === 'MOBILE_MONEY' ? buyer.phone.trim() : null;
+            const networkId = methodForPayment.type === 'CRYPTO' ? selectedCryptoNetworkId : (methodForPayment.networkId || null);
             const paidOrder = await apiFetch(
                 `/public/commerce/orders/${encodeURIComponent(currentOrder.reference)}/payments/start?accessToken=${encodeURIComponent(currentOrder.accessToken || '')}`,
                 {
@@ -654,14 +711,17 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         paymentMethodId: methodForPayment.id,
-                        accountNumber: methodForPayment.type === 'MOBILE_MONEY' ? buyer.phone.trim() : null,
-                        networkId: methodForPayment.type === 'CRYPTO' ? selectedCryptoNetworkId : (methodForPayment.networkId || null),
+                        accountNumber,
+                        networkId,
                         amount: paymentQuote.paymentAmount ?? paymentQuote.grossAmount ?? currentOrder.billingAmount ?? currentOrder.paymentAmount,
                         currency: paymentQuote.paymentCurrency || paymentQuote.grossAmountCurrency || currentOrder.billingCurrency || currentOrder.paymentCurrency,
                         paymentMethod: {
                             id: methodForPayment.id,
                             type: methodForPayment.type,
                             currency: methodForPayment.currency || currentOrder.paymentCurrency,
+                            accountRef: accountNumber,
+                            networkId,
+                            feeApplicationMode: methodForPayment.feeApplicationMode || null,
                         },
                         idempotencyKey: idempotencyKey(`commerce-${currentOrder.reference}`),
                     }),
@@ -725,19 +785,23 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }, [selectedPaymentMethod?.id, selectedPaymentMethod?.type]);
 
     useEffect(() => {
-        if (!cartItems.length) {
-            setDiscoveredPaymentMethods([]);
+        const fallbackProduct = cartItems[0]?.product || products.find((product) => product?.priceCurrency);
+        const discoveryAmount = cartItems.length ? cartSubtotal(cartItems) : number(fallbackProduct?.priceAmount);
+        const discoveryCurrency = cartItems[0]?.product?.priceCurrency ||
+            fallbackProduct?.priceCurrency ||
+            currencies.paymentCurrency ||
+            currencies.billingCurrency ||
+            '';
+
+        if (!discoveryCurrency) {
+            setPaymentMethodsLoaded(false);
             setPaymentMethodsError(null);
             return undefined;
         }
 
-        const discoveryAmount = cartSubtotal(cartItems);
-        const discoveryCurrency = cartItems[0]?.product?.priceCurrency || currencies.paymentCurrency || currencies.billingCurrency || '';
-        if (!discoveryAmount || !discoveryCurrency) return undefined;
-
         let cancelled = false;
         const timer = window.setTimeout(() => {
-            fetchPaymentMethodsForAmount({ amount: discoveryAmount, currency: discoveryCurrency })
+            fetchPaymentMethodsForAmount({ amount: discoveryAmount || 0, currency: discoveryCurrency })
                 .catch(() => {
                     if (!cancelled) {
                         // The visible error state is set in fetchPaymentMethodsForAmount.
@@ -749,12 +813,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             cancelled = true;
             window.clearTimeout(timer);
         };
-    }, [cartItems, currencies.billingCurrency, currencies.paymentCurrency, fetchPaymentMethodsForAmount]);
+    }, [cartItems, products, currencies.billingCurrency, currencies.paymentCurrency, fetchPaymentMethodsForAmount]);
 
     useEffect(() => {
         if (!order?.reference || !order?.accessToken) return undefined;
-        const status = String(order.status || '').toUpperCase();
-        if (status && status !== 'PENDING_PAYMENT') return undefined;
+        if (isOrderTerminal(order)) return undefined;
 
         let cancelled = false;
         const poll = async () => {
@@ -773,7 +836,22 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             cancelled = true;
             window.clearInterval(timer);
         };
-    }, [order?.accessToken, order?.reference, order?.status]);
+    }, [order?.accessToken, order?.paymentTransactionStatus, order?.reference, order?.status]);
+
+    useEffect(() => {
+        if (!isOrderPaid(order)) return;
+        setPaymentReviewOpen(false);
+        setPaymentReviewContext(null);
+        setPaymentPrompt((current) => (
+            current?.type === 'PAID'
+                ? current
+                : {
+                    type: 'PAID',
+                    reference: order?.reference || '',
+                    total: amount(order?.totalAmount ?? order?.paymentAmount, order?.totalCurrency || order?.paymentCurrency),
+                }
+        ));
+    }, [order?.paymentAmount, order?.paymentCurrency, order?.paymentTransactionStatus, order?.reference, order?.status, order?.totalAmount, order?.totalCurrency]);
 
     if (loading) {
         return <Screen><StateCard title="Loading storefront..." /></Screen>;
@@ -823,6 +901,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 setCheckout(null);
                 setDiscoveredPaymentMethods([]);
                 setPaymentMethodsError(null);
+                setPaymentMethodsLoaded(false);
                 setCryptoNetworks([]);
                 setCryptoNetworksError(null);
                 setSelectedCryptoNetworkId(null);
@@ -854,12 +933,20 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             address={paymentPrompt.address}
             amount={paymentPrompt.amount}
             networkName={paymentPrompt.networkName}
+            invoiceUrl={paymentPrompt.invoiceUrl}
+            expiresAt={paymentPrompt.expiresAt}
             hint={paymentPrompt.hint}
+            onClose={() => setPaymentPrompt(null)}
+        />
+    ) : paymentPrompt?.type === 'PAID' ? (
+        <PaymentSuccessModal
+            reference={paymentPrompt.reference}
+            total={paymentPrompt.total}
             onClose={() => setPaymentPrompt(null)}
         />
     ) : null;
 
-    if (order) {
+    if (order && showOrderPaymentView) {
         return (
             <Screen>
                 <section className="order-panel">
@@ -888,6 +975,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         paymentMethods={paymentMethods}
                         paymentMethodsLoading={paymentMethodsLoading}
                         paymentMethodsError={paymentMethodsError}
+                        paymentMethodsLoaded={paymentMethodsLoaded}
                         cryptoNetworks={cryptoNetworks}
                         cryptoNetworksLoading={cryptoNetworksLoading}
                         cryptoNetworksError={cryptoNetworksError}
@@ -909,10 +997,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     {paymentPromptModal}
 
                     <button
+                        type="button"
                         className="button secondary"
                         onClick={() => {
                             setOrder(null);
                             setCheckout(null);
+                            setShowOrderPaymentView(false);
                             setQuote(null);
                             setCart({});
                             setFlowError(null);
@@ -958,6 +1048,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                             paymentMethods={paymentMethods}
                             paymentMethodsLoading={paymentMethodsLoading}
                             paymentMethodsError={paymentMethodsError}
+                            paymentMethodsLoaded={paymentMethodsLoaded}
                             cryptoNetworks={cryptoNetworks}
                             cryptoNetworksLoading={cryptoNetworksLoading}
                             cryptoNetworksError={cryptoNetworksError}
@@ -1030,6 +1121,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         paymentMethods={paymentMethods}
                         paymentMethodsLoading={paymentMethodsLoading}
                         paymentMethodsError={paymentMethodsError}
+                        paymentMethodsLoaded={paymentMethodsLoaded}
                         cryptoNetworks={cryptoNetworks}
                         cryptoNetworksLoading={cryptoNetworksLoading}
                         cryptoNetworksError={cryptoNetworksError}
@@ -1150,7 +1242,6 @@ function StoreHeader({ store }) {
                     {store.description && <p>{store.description}</p>}
                     <div className="store-meta">
                         {store.countryCode && <span>{store.countryCode}</span>}
-                        {store.defaultCurrency && <span>{store.defaultCurrency}</span>}
                     </div>
                 </div>
             </div>
@@ -1276,6 +1367,7 @@ function CheckoutPaymentForm({
     paymentMethods,
     paymentMethodsLoading,
     paymentMethodsError,
+    paymentMethodsLoaded,
     cryptoNetworks,
     cryptoNetworksLoading,
     cryptoNetworksError,
@@ -1324,10 +1416,12 @@ function CheckoutPaymentForm({
                     <p className="muted">Choose products to start a checkout.</p>
                 )}
 
-                <div className="commerce-payment-total">
-                    <span>Estimated subtotal</span>
-                    <strong>{amount(cartSubtotal, cartCurrency)}</strong>
-                </div>
+                {cartItems.length > 0 && (
+                    <div className="commerce-payment-total">
+                        <span>Estimated subtotal</span>
+                        <strong>{amount(cartSubtotal, cartCurrency)}</strong>
+                    </div>
+                )}
             </section>
 
             <section className="payment-step-card">
@@ -1365,6 +1459,7 @@ function CheckoutPaymentForm({
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
+                    loaded={paymentMethodsLoaded}
                     cryptoNetworks={cryptoNetworks}
                     cryptoNetworksLoading={cryptoNetworksLoading}
                     cryptoNetworksError={cryptoNetworksError}
@@ -1375,7 +1470,7 @@ function CheckoutPaymentForm({
                 />
 
                 <div className="actions payment-actions">
-                    <button className="button primary" onClick={onConfirm} disabled={busy || !cartItems.length}>
+                    <button type="button" className="button primary" onClick={onConfirm} disabled={busy || !cartItems.length}>
                         {busy ? 'Working...' : 'Start payment'}
                     </button>
                 </div>
@@ -1404,6 +1499,7 @@ function OrderPaymentPanel({
     paymentMethods,
     paymentMethodsLoading,
     paymentMethodsError,
+    paymentMethodsLoaded,
     cryptoNetworks,
     cryptoNetworksLoading,
     cryptoNetworksError,
@@ -1453,6 +1549,7 @@ function OrderPaymentPanel({
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
+                    loaded={paymentMethodsLoaded}
                     cryptoNetworks={cryptoNetworks}
                     cryptoNetworksLoading={cryptoNetworksLoading}
                     cryptoNetworksError={cryptoNetworksError}
@@ -1464,7 +1561,7 @@ function OrderPaymentPanel({
                 />
 
                 <div className="actions payment-actions">
-                    <button className="button primary" onClick={onConfirm} disabled={busy || !payable}>
+                    <button type="button" className="button primary" onClick={onConfirm} disabled={busy || !payable}>
                         {busy ? 'Working...' : 'Start payment'}
                     </button>
                 </div>
@@ -1492,6 +1589,7 @@ function PaymentMethodPicker({
     methods,
     loading,
     error,
+    loaded = false,
     cryptoNetworks,
     cryptoNetworksLoading,
     cryptoNetworksError,
@@ -1617,11 +1715,13 @@ function PaymentMethodPicker({
                         </section>
                     ))}
                 </div>
-            ) : (
+            ) : loaded && !loading && !error ? (
                 <div className="payment-method-empty">
                     No payment methods are available for this country yet.
                 </div>
-            )}
+            ) : !loading && !error ? (
+                <div className="payment-method-status">Loading payment methods...</div>
+            ) : null}
         </div>
     );
 }
@@ -1671,10 +1771,56 @@ function MobileMoneyPromptModal({ number, hint, onClose }) {
     );
 }
 
-function CryptoPaymentModal({ address, amount, networkName, hint, onClose }) {
-    const qrSrc = address
-        ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(address)}`
+function PaymentSuccessModal({ reference, total, onClose }) {
+    return (
+        <div className="payment-action-backdrop payment-success-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="payment-action-modal payment-success-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="payment-success-graffiti" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                </div>
+                <div className="payment-action-header payment-success-header">
+                    <span className="payment-success-kicker">Order confirmed</span>
+                    <button type="button" className="payment-action-close" onClick={onClose}>Close</button>
+                </div>
+                <div className="payment-success-mark-wrap">
+                    <div className="payment-success-ring" aria-hidden="true" />
+                    <div className="payment-success-mark" aria-hidden="true">✓</div>
+                </div>
+                <h3 className="payment-success-title">Payment received</h3>
+                <p className="payment-action-copy payment-success-copy">
+                    Your payment is confirmed and the merchant has been notified.
+                </p>
+                <div className="payment-success-receipt">
+                    {total && (
+                        <div>
+                            <span>Total paid</span>
+                            <strong>{total}</strong>
+                        </div>
+                    )}
+                    {reference && (
+                        <div>
+                            <span>Order</span>
+                            <strong>{reference}</strong>
+                        </div>
+                    )}
+                </div>
+                <button type="button" className="payment-success-done" onClick={onClose}>Done</button>
+            </div>
+        </div>
+    );
+}
+
+function CryptoPaymentModal({ address, amount, networkName, invoiceUrl, expiresAt, hint, onClose }) {
+    const qrValue = invoiceUrl || address;
+    const qrSrc = qrValue
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(qrValue)}`
         : '';
+    const expiryLabel = formatExpiry(expiresAt);
 
     return (
         <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
@@ -1694,6 +1840,7 @@ function CryptoPaymentModal({ address, amount, networkName, hint, onClose }) {
                     <div className="crypto-payment-details">
                         <ReviewSummaryLine label="Amount" value={amount || '-'} highlight />
                         <ReviewSummaryLine label="Network" value={networkName || '-'} />
+                        {expiryLabel && <ReviewSummaryLine label="Expires" value={expiryLabel} />}
                         <div className="crypto-address-block">
                             <span>Address</span>
                             <code title={address}>{address || '-'}</code>
@@ -1701,6 +1848,11 @@ function CryptoPaymentModal({ address, amount, networkName, hint, onClose }) {
                         <button type="button" className="payment-action-copy-button" onClick={() => copyToClipboard(address)}>
                             Copy address
                         </button>
+                        {invoiceUrl && (
+                            <a className="payment-action-copy-button payment-action-link-button" href={invoiceUrl} target="_blank" rel="noreferrer">
+                                Open invoice
+                            </a>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1790,7 +1942,7 @@ function CryptoNetworkSelector({ networks, loading, error, selectedNetworkId, on
                                 aria-pressed={active}
                             >
                                 <span className="crypto-network-dot" aria-hidden="true" />
-                                {network.displayName || network.name}
+                                <span className="crypto-network-pill-label">{network.displayName || network.name}</span>
                             </button>
                         );
                     })}
