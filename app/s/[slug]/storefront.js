@@ -88,6 +88,11 @@ function parseCryptoHint(text) {
     }
 }
 
+function currencyBadgeClass(currency) {
+    const code = String(currency || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return code ? `currency-badge currency-badge--${code}` : 'currency-badge';
+}
+
 function formatCryptoPaymentAmount(details, fallback) {
     const value = details?.amountInCrypto ?? details?.cryptoAmount ?? details?.amount;
     const currency = details?.cryptoCurrency || details?.currency || '';
@@ -310,6 +315,19 @@ function productImage(product) {
     return product?.image1 || product?.imageUrl || product?.image2 || product?.image3 || product?.image4 || '';
 }
 
+function productImages(product) {
+    return [
+        product?.image1,
+        product?.imageUrl,
+        product?.image2,
+        product?.image3,
+        product?.image4,
+    ]
+        .map((image) => String(image || '').trim())
+        .filter(Boolean)
+        .filter((image, index, images) => images.indexOf(image) === index);
+}
+
 function checkoutPayload(cartItems, buyer, currencies) {
     const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
     const billingCurrency = cartCurrency || currencies.billingCurrency;
@@ -409,6 +427,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const seededCurrency = firstCurrency(seededProducts);
     const [currencies, setCurrencies] = useState({ billingCurrency: seededCurrency, paymentCurrency: seededCurrency });
     const [selectedProduct, setSelectedProduct] = useState(null);
+    const [imageGallery, setImageGallery] = useState(null);
     const [quote, setQuote] = useState(null);
     const [paymentReviewOpen, setPaymentReviewOpen] = useState(false);
     const [paymentReviewContext, setPaymentReviewContext] = useState(null);
@@ -1050,7 +1069,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         return (
             <Screen wide>
                 <div className="product-page-layout">
-                    <ProductHero product={directProduct} store={store} />
+                    <ProductHero
+                        product={directProduct}
+                        store={store}
+                        onOpenGallery={(startIndex = 0) => setImageGallery({ product: directProduct, index: startIndex })}
+                    />
 
                     <aside className="checkout-panel product-checkout-panel" aria-label="Checkout">
                         <div className="section-heading">
@@ -1100,6 +1123,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         {countryPicker}
                         {reviewSheet}
                         {paymentPromptModal}
+                        {imageGallery && (
+                            <ProductImageGallery
+                                product={imageGallery.product}
+                                index={imageGallery.index}
+                                onIndexChange={(index) => setImageGallery((current) => current ? { ...current, index } : current)}
+                                onClose={() => setImageGallery(null)}
+                            />
+                        )}
                     </aside>
                 </div>
             </Screen>
@@ -1125,6 +1156,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                                     product={product}
                                     quantity={number(cart[product.id])}
                                     onOpen={() => setSelectedProduct(product)}
+                                    onOpenGallery={(startIndex = 0) => setImageGallery({ product, index: startIndex })}
                                     onIncrement={() => changeQuantity(product.id, 1)}
                                     onDecrement={() => changeQuantity(product.id, -1)}
                                 />
@@ -1178,8 +1210,17 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     product={selectedProduct}
                     quantity={number(cart[selectedProduct.id])}
                     onClose={() => setSelectedProduct(null)}
+                    onOpenGallery={(startIndex = 0) => setImageGallery({ product: selectedProduct, index: startIndex })}
                     onIncrement={() => changeQuantity(selectedProduct.id, 1)}
                     onDecrement={() => changeQuantity(selectedProduct.id, -1)}
+                />
+            )}
+            {imageGallery && (
+                <ProductImageGallery
+                    product={imageGallery.product}
+                    index={imageGallery.index}
+                    onIndexChange={(index) => setImageGallery((current) => current ? { ...current, index } : current)}
+                    onClose={() => setImageGallery(null)}
                 />
             )}
             {countryPicker}
@@ -1189,17 +1230,25 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     );
 }
 
-function ProductHero({ product, store }) {
-    const image = productImage(product);
+function ProductHero({ product, store, onOpenGallery }) {
+    const images = productImages(product);
+    const image = images[0];
     return (
         <section className="product-page-hero">
-            <div className="product-page-media">
+            <button
+                type="button"
+                className="product-page-media product-page-media--button"
+                onClick={() => image && onOpenGallery?.(0)}
+                aria-label={image ? `Zoom ${product.name}` : product.name}
+                disabled={!image}
+            >
                 {image ? (
                     <img src={image} alt={product.name || ''} />
                 ) : (
                     <div className="product-page-media-fallback">{initials(product.name)}</div>
                 )}
-            </div>
+                {images.length > 1 && <span className="product-image-count product-image-count--hero">{images.length} photos</span>}
+            </button>
 
             <div className="product-page-copy">
                 <div className="product-page-store">
@@ -1311,13 +1360,19 @@ function StoreContactActions({ store, compact = false }) {
     );
 }
 
-function ProductCard({ product, quantity, onOpen, onIncrement, onDecrement }) {
+function ProductCard({ product, quantity, onOpen, onOpenGallery, onIncrement, onDecrement }) {
     const out = inventoryLabel(product) === 'Out of stock';
-    const image = productImage(product);
+    const images = productImages(product);
+    const image = images[0];
     return (
         <article className="product-card">
-            <button className="product-preview" onClick={onOpen} aria-label={`View ${product.name}`}>
+            <button
+                className="product-preview"
+                onClick={() => image ? onOpenGallery(0) : onOpen()}
+                aria-label={image ? `Zoom ${product.name}` : `View ${product.name}`}
+            >
                 {image ? <img src={image} alt="" /> : initials(product.name)}
+                {images.length > 1 && <span className="product-image-count">{images.length} photos</span>}
             </button>
             <div className="product-body">
                 <button className="product-title" onClick={onOpen}>{product.name}</button>
@@ -1339,6 +1394,15 @@ function Quantity({ quantity, onIncrement, onDecrement, disabled }) {
             <span>{quantity}</span>
             <button onClick={onIncrement} disabled={disabled} aria-label="Increase quantity">+</button>
         </div>
+    );
+}
+
+function LoadingButtonLabel({ label }) {
+    return (
+        <span className="button-loading-label">
+            <span className="button-spinner" aria-hidden="true" />
+            <span>{label}</span>
+        </span>
     );
 }
 
@@ -1533,13 +1597,9 @@ function CheckoutPaymentForm({
 
                 <div className="actions payment-actions">
                     <button type="button" className="button primary" onClick={onConfirm} disabled={busy || !cartItems.length}>
-                        {busy ? 'Working...' : 'Start payment'}
+                        {busy ? <LoadingButtonLabel label="Starting payment" /> : 'Start payment'}
                     </button>
                 </div>
-
-                {checkout && (
-                    <p className="muted">Checkout {checkout.id} created. Creating order...</p>
-                )}
 
                 {flowError && (
                     isFeatureDisabled(flowError)
@@ -1624,13 +1684,9 @@ function OrderPaymentPanel({
 
                 <div className="actions payment-actions">
                     <button type="button" className="button primary" onClick={onConfirm} disabled={busy || !payable}>
-                        {busy ? 'Working...' : 'Start payment'}
+                        {busy ? <LoadingButtonLabel label="Starting payment" /> : 'Start payment'}
                     </button>
                 </div>
-
-                {checkout && (
-                    <p className="muted">Checkout {checkout.id} is linked to this order.</p>
-                )}
 
                 {flowError && (
                     isFeatureDisabled(flowError)
@@ -1748,7 +1804,7 @@ function PaymentMethodPicker({
                                                             {methodInitials(method)}
                                                         </span>
                                                     )}
-                                                    {method.currency && <span className="currency-badge">{method.currency}</span>}
+                                                    {method.currency && <span className={currencyBadgeClass(method.currency)}>{method.currency}</span>}
                                                     <strong>{method.name}</strong>
                                                 </button>
                                             );
@@ -2135,13 +2191,96 @@ function FxDetails({ fx }) {
     );
 }
 
-function ProductDialog({ product, quantity, onClose, onIncrement, onDecrement }) {
+function ProductImageGallery({ product, index = 0, onIndexChange, onClose }) {
+    const images = productImages(product);
+    if (!images.length) return null;
+
+    const safeIndex = Math.min(Math.max(0, number(index)), images.length - 1);
+    const currentImage = images[safeIndex];
+    const hasMany = images.length > 1;
+    const goTo = (nextIndex) => {
+        const wrapped = (nextIndex + images.length) % images.length;
+        onIndexChange(wrapped);
+    };
+
+    return (
+        <div className="image-gallery-backdrop" role="dialog" aria-modal="true" aria-label={`${product.name} images`} onClick={onClose}>
+            <section className="image-gallery" onClick={(event) => event.stopPropagation()}>
+                <div className="image-gallery-header">
+                    <div>
+                        <strong>{product.name}</strong>
+                        {hasMany && <span>{safeIndex + 1} / {images.length}</span>}
+                    </div>
+                    <button type="button" onClick={onClose} aria-label="Close image gallery">x</button>
+                </div>
+
+                <div className="image-gallery-stage">
+                    {hasMany && (
+                        <button type="button" className="image-gallery-nav image-gallery-nav--prev" onClick={() => goTo(safeIndex - 1)} aria-label="Previous image">
+                            ‹
+                        </button>
+                    )}
+                    <img src={currentImage} alt={product.name || ''} />
+                    {hasMany && (
+                        <button type="button" className="image-gallery-nav image-gallery-nav--next" onClick={() => goTo(safeIndex + 1)} aria-label="Next image">
+                            ›
+                        </button>
+                    )}
+                </div>
+
+                {hasMany && (
+                    <div className="image-gallery-thumbs" aria-label="Choose image">
+                        {images.map((image, thumbIndex) => (
+                            <button
+                                type="button"
+                                key={image}
+                                className={thumbIndex === safeIndex ? 'image-gallery-thumb--active' : ''}
+                                onClick={() => goTo(thumbIndex)}
+                                aria-label={`Show image ${thumbIndex + 1}`}
+                                aria-pressed={thumbIndex === safeIndex}
+                            >
+                                <img src={image} alt="" />
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </section>
+        </div>
+    );
+}
+
+function ProductDialog({ product, quantity, onClose, onOpenGallery, onIncrement, onDecrement }) {
     const out = inventoryLabel(product) === 'Out of stock';
+    const images = productImages(product);
+    const image = images[0];
     return (
         <div className="dialog-backdrop" onClick={onClose} role="presentation">
             <section className="dialog" role="dialog" aria-modal="true" aria-label={product.name} onClick={(event) => event.stopPropagation()}>
                 <button className="dialog-close" onClick={onClose} aria-label="Close">x</button>
-                <div className="dialog-preview">{initials(product.name)}</div>
+                <button
+                    type="button"
+                    className="dialog-preview dialog-preview--button"
+                    onClick={() => image && onOpenGallery?.(0)}
+                    disabled={!image}
+                    aria-label={image ? `Zoom ${product.name}` : product.name}
+                >
+                    {image ? <img src={image} alt="" /> : initials(product.name)}
+                    {images.length > 1 && <span className="product-image-count">{images.length} photos</span>}
+                </button>
+                {images.length > 1 && (
+                    <div className="dialog-gallery-strip" aria-label="Product images">
+                        {images.map((item, index) => (
+                            <button
+                                type="button"
+                                key={item}
+                                onClick={() => onOpenGallery?.(index)}
+                                aria-label={`View image ${index + 1} of ${images.length}`}
+                            >
+                                <img src={item} alt="" />
+                            </button>
+                        ))}
+                    </div>
+                )}
                 <h2>{product.name}</h2>
                 <p>{product.description || 'No description provided.'}</p>
                 <div className="product-meta">

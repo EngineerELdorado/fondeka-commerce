@@ -31,6 +31,8 @@ export default function DownloadAppButton({
     className = '',
     variant = 'default',
     trackingId,
+    ariaLabel,
+    children = null,
 }) {
     const [platform, setPlatform] = useState('other');
     const [open, setOpen] = useState(false);
@@ -40,6 +42,11 @@ export default function DownloadAppButton({
     const qrPlay = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}&data=${encodeURIComponent(playUrl)}&margin=0`;
     const qrApple = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}&data=${encodeURIComponent(appStoreUrl)}&margin=0`;
     const isHero = variant === 'hero';
+    const isImage = variant === 'image';
+    const triggerContent = children || <span>{label}</span>;
+    const triggerClassName = isImage
+        ? 'download-image-trigger'
+        : `button primary download-button ${isHero ? 'download-button--hero' : ''}`;
 
     useEffect(() => {
         setPlatform(getDevicePlatform());
@@ -68,12 +75,16 @@ export default function DownloadAppButton({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`button primary download-button ${isHero ? 'download-button--hero' : ''}`}
+                    className={triggerClassName}
                     data-download-button={trackingId || undefined}
-                    aria-label={mobileLabel}
+                    aria-label={ariaLabel || mobileLabel}
                 >
-                    <Icon />
-                    <span>{mobileLabel}</span>
+                    {children ? triggerContent : (
+                        <>
+                            <Icon />
+                            <span>{mobileLabel}</span>
+                        </>
+                    )}
                 </a>
             </div>
         );
@@ -87,12 +98,13 @@ export default function DownloadAppButton({
                     event.stopPropagation();
                     setOpen((current) => !current);
                 }}
-                className={`button primary download-button ${isHero ? 'download-button--hero' : ''}`}
+                className={triggerClassName}
                 aria-haspopup="dialog"
                 aria-expanded={open}
+                aria-label={ariaLabel || label}
                 data-download-button={trackingId || undefined}
             >
-                <span>{label}</span>
+                {triggerContent}
             </button>
 
             {open && (

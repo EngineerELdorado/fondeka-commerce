@@ -356,7 +356,16 @@ export default async function Home({ searchParams }) {
                 </nav>
                 <div className="landing-nav-actions">
                     <LanguageSwitcher activeLocale={locale} />
-                    <a className="button primary landing-nav-action" href="#download">{copy.nav.download}</a>
+                    <DownloadAppButton
+                        label={copy.nav.download}
+                        androidLabel={copy.cta.android}
+                        iosLabel={copy.cta.ios}
+                        desktopTitle={copy.cta.desktopTitle}
+                        desktopBody={copy.cta.desktopBody}
+                        desktopCta={copy.cta.desktopCta}
+                        className="landing-nav-action"
+                        trackingId="landing-nav-download"
+                    />
                 </div>
             </header>
 
@@ -367,7 +376,16 @@ export default async function Home({ searchParams }) {
                         <h1>{copy.hero.title}</h1>
                         <p className="hero-lede">{copy.hero.lede}</p>
                         <div className="hero-actions" id="stores">
-                            <a className="button primary" href="/s/demo-store">{copy.hero.primary}</a>
+                            <DownloadAppButton
+                                label={copy.cta.button}
+                                androidLabel={copy.cta.android}
+                                iosLabel={copy.cta.ios}
+                                desktopTitle={copy.cta.desktopTitle}
+                                desktopBody={copy.cta.desktopBody}
+                                desktopCta={copy.cta.desktopCta}
+                                variant="hero"
+                                trackingId="landing-hero-download"
+                            />
                             <a className="button secondary" href="#platform">{copy.hero.secondary}</a>
                         </div>
                         <dl className="hero-proof" aria-label={copy.hero.proofLabel}>
@@ -379,14 +397,25 @@ export default async function Home({ searchParams }) {
                             ))}
                         </dl>
                     </div>
-                    <div className="landing-hero-image-panel" aria-label="Fondeka Commerce app preview">
+                    <DownloadAppButton
+                        variant="image"
+                        className="landing-hero-image-panel"
+                        label={copy.cta.button}
+                        androidLabel={copy.cta.android}
+                        iosLabel={copy.cta.ios}
+                        desktopTitle={copy.cta.desktopTitle}
+                        desktopBody={copy.cta.desktopBody}
+                        desktopCta={copy.cta.desktopCta}
+                        ariaLabel={copy.cta.button}
+                        trackingId="landing-hero-image-download"
+                    >
                         <img
                             src={heroImageFor(locale)}
                             alt={locale === 'fr'
                                 ? 'Aperçu de Fondeka Commerce en français'
                                 : 'Fondeka Commerce preview in English'}
                         />
-                    </div>
+                    </DownloadAppButton>
                 </div>
             </section>
 
