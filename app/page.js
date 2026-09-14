@@ -273,6 +273,10 @@ function contentFor(locale) {
     return landingCopy[locale] || landingCopy.en;
 }
 
+function heroImageFor(locale) {
+    return locale === 'fr' ? '/commerce_french.png' : '/commerce_english.png';
+}
+
 function buildJsonLd(copy) {
     return {
         '@context': 'https://schema.org',
@@ -375,29 +379,13 @@ export default async function Home({ searchParams }) {
                             ))}
                         </dl>
                     </div>
-                    <div className="storefront-preview" aria-label="Fondeka Commerce storefront preview">
-                        <div className="preview-toolbar">
-                            <span />
-                            <span />
-                            <span />
-                            <strong>{copy.preview.url}</strong>
-                        </div>
-                        <div className="preview-banner">
-                            <div>
-                                <span className="preview-logo">FC</span>
-                                <h2>{copy.preview.title}</h2>
-                                <p>{copy.preview.text}</p>
-                            </div>
-                        </div>
-                        <div className="preview-grid">
-                            {copy.preview.cards.map((card) => (
-                                <article key={card.title}>
-                                    <span>{card.step}</span>
-                                    <strong>{card.title}</strong>
-                                    <p>{card.text}</p>
-                                </article>
-                            ))}
-                        </div>
+                    <div className="landing-hero-image-panel" aria-label="Fondeka Commerce app preview">
+                        <img
+                            src={heroImageFor(locale)}
+                            alt={locale === 'fr'
+                                ? 'Aperçu de Fondeka Commerce en français'
+                                : 'Fondeka Commerce preview in English'}
+                        />
                     </div>
                 </div>
             </section>

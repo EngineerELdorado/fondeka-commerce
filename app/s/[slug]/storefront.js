@@ -109,6 +109,36 @@ function formatExpiry(value) {
     });
 }
 
+function whatsappLink(number) {
+    const digits = phoneDigits(number);
+    return digits ? `https://wa.me/${digits}` : '';
+}
+
+function storeContactLinks(store) {
+    const links = [];
+    const whatsappHref = whatsappLink(store?.whatsappNumber);
+    if (whatsappHref) {
+        links.push({ key: 'whatsapp', label: 'WhatsApp', href: whatsappHref, kind: 'contact' });
+    }
+    if (store?.contactEmail) {
+        links.push({ key: 'email', label: 'Email', href: `mailto:${store.contactEmail}`, kind: 'contact' });
+    }
+    return links;
+}
+
+function storeSocialLinks(store) {
+    return [
+        ['facebookUrl', 'Facebook'],
+        ['instagramUrl', 'Instagram'],
+        ['youtubeUrl', 'YouTube'],
+        ['linkedinUrl', 'LinkedIn'],
+        ['twitterUrl', 'X'],
+        ['tiktokUrl', 'TikTok'],
+    ]
+        .map(([field, label]) => ({ key: field, label, href: store?.[field] }))
+        .filter((link) => link.href);
+}
+
 async function copyToClipboard(text) {
     try {
         await navigator.clipboard.writeText(String(text || ''));
@@ -1192,6 +1222,7 @@ function ProductHero({ product, store }) {
                     <span>{inventoryLabel(product)}</span>
                     {store?.countryCode && <span>{store.countryCode}</span>}
                 </div>
+                <StoreContactActions store={store} compact />
             </div>
         </section>
     );
@@ -1243,9 +1274,40 @@ function StoreHeader({ store }) {
                     <div className="store-meta">
                         {store.countryCode && <span>{store.countryCode}</span>}
                     </div>
+                    <StoreContactActions store={store} />
                 </div>
             </div>
         </section>
+    );
+}
+
+function StoreContactActions({ store, compact = false }) {
+    const contactLinks = storeContactLinks(store);
+    const socialLinks = storeSocialLinks(store);
+
+    if (!contactLinks.length && !socialLinks.length) return null;
+
+    return (
+        <div className={`store-contact-actions${compact ? ' store-contact-actions--compact' : ''}`}>
+            {!!contactLinks.length && (
+                <div className="store-contact-primary" aria-label="Store contact actions">
+                    {contactLinks.map((link) => (
+                        <a key={link.key} href={link.href} target={link.key === 'whatsapp' ? '_blank' : undefined} rel={link.key === 'whatsapp' ? 'noreferrer' : undefined}>
+                            {link.label}
+                        </a>
+                    ))}
+                </div>
+            )}
+            {!!socialLinks.length && (
+                <div className="store-social-links" aria-label="Store social links">
+                    {socialLinks.map((link) => (
+                        <a key={link.key} href={link.href} target="_blank" rel="noreferrer" aria-label={link.label}>
+                            {link.label}
+                        </a>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }
 
