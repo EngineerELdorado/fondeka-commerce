@@ -5,6 +5,7 @@ import { apiFetch } from '../../../lib/api';
 
 const PAGE_SIZE = 20;
 const BUYER_DETAILS_STORAGE_KEY = 'fondeka-commerce-buyer-details';
+const MOBILE_BROWSER_RE = /Android|iPhone|iPad|iPod/i;
 const COUNTRY_OPTIONS = [
     { code: 'CD', name: 'Congo', callingCode: '243', flag: '🇨🇩' },
     { code: 'CG', name: 'Congo (Brazza)', callingCode: '242', flag: '🇨🇬' },
@@ -35,6 +36,12 @@ const PAYMENT_TYPE_LABELS = {
     WALLET: 'Wallet',
     BALANCE: 'Wallet',
     OTHER: 'Other',
+};
+const STORE_TABS = ['PRODUCTS', 'ABOUT', 'REVIEWS'];
+const STORE_TAB_LABELS = {
+    PRODUCTS: 'Products',
+    ABOUT: 'About',
+    REVIEWS: 'Reviews',
 };
 
 function pageItems(payload) {
@@ -114,6 +121,48 @@ function formatExpiry(value) {
     });
 }
 
+function formatReviewDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+}
+
+function formatMemberSince(value, long = false) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat(undefined, {
+        month: long ? 'long' : 'short',
+        year: 'numeric',
+    }).format(date);
+}
+
+function normalizeStoreReview(review) {
+    const rawStars = number(review?.stars ?? review?.rating);
+    const stars = Math.max(1, Math.min(5, Math.round(rawStars)));
+    const message = String(review?.message || review?.comment || '').trim();
+    if (!rawStars || !message) return null;
+    return {
+        id: review?.id || `${stars}-${message}`,
+        stars,
+        message,
+        reviewerName: review?.reviewerName || review?.customerName || review?.buyerName || review?.accountName || '',
+        createdAt: review?.createdAt || review?.updatedAt || '',
+        replyMessage: review?.replyMessage || '',
+        replyByName: review?.replyByName || '',
+        repliedAt: review?.repliedAt || '',
+    };
+}
+
+function isVerifiedStatus(value) {
+    return String(value || '').trim().toUpperCase() === 'VERIFIED';
+}
+
 function whatsappLink(number) {
     const digits = phoneDigits(number);
     return digits ? `https://wa.me/${digits}` : '';
@@ -133,15 +182,36 @@ function storeContactLinks(store) {
 
 function storeSocialLinks(store) {
     return [
-        ['facebookUrl', 'Facebook'],
-        ['instagramUrl', 'Instagram'],
-        ['youtubeUrl', 'YouTube'],
-        ['linkedinUrl', 'LinkedIn'],
-        ['twitterUrl', 'X'],
-        ['tiktokUrl', 'TikTok'],
+        ['instagramUrl', 'Instagram', 'IG'],
+        ['facebookUrl', 'Facebook', 'f'],
+        ['tiktokUrl', 'TikTok', '♪'],
+        ['youtubeUrl', 'YouTube', '▶'],
+        ['twitterUrl', 'X', 'X'],
+        ['linkedinUrl', 'LinkedIn', 'in'],
     ]
-        .map(([field, label]) => ({ key: field, label, href: store?.[field] }))
+        .map(([field, label, icon]) => ({ key: field, label, icon, href: store?.[field] }))
         .filter((link) => link.href);
+}
+
+function storeCategories(store, products = []) {
+    const values = [
+        ...(Array.isArray(store?.categories) ? store.categories : []),
+        store?.category,
+        store?.marketplaceCategory,
+        ...products.map((product) => product?.marketplaceCategory || product?.type),
+    ]
+        .filter(Boolean)
+        .map((value) => String(value).replace(/_/g, ' ').trim())
+        .filter(Boolean);
+    return Array.from(new Set(values)).slice(0, 3);
+}
+
+function storeCapabilities(store) {
+    return [
+        store?.deliveryEnabled ? { key: 'delivery', icon: '↗', label: 'Delivery' } : null,
+        store?.securePayments ? { key: 'secure', icon: '✓', label: 'Secure payments' } : null,
+        store?.supportEnabled ? { key: 'support', icon: '•', label: 'Support' } : null,
+    ].filter(Boolean);
 }
 
 async function copyToClipboard(text) {
@@ -328,6 +398,51 @@ function productImages(product) {
         .filter((image, index, images) => images.indexOf(image) === index);
 }
 
+function getFondekaCommerceSchemeBase() {
+    const env = String(
+        process.env.NEXT_PUBLIC_FONDEKA_APP_ENV ||
+        process.env.NEXT_PUBLIC_APP_ENV ||
+        process.env.NEXT_PUBLIC_VERCEL_ENV ||
+        ''
+    ).toLowerCase();
+
+    if (['dev', 'development', 'local'].includes(env)) return 'fondeka-dev://commerce/marketplace';
+    if (['preview', 'staging'].includes(env)) return 'fondeka-preview://commerce/marketplace';
+    return 'fondeka://commerce/marketplace';
+}
+
+function commerceAppCheckoutDeepLink(cartItems, currencies) {
+    const items = cartItems
+        .filter(({ product, quantity }) => product?.id && number(quantity) > 0)
+        .map(({ product, quantity }) => ({
+            productId: product.id,
+            quantity: Math.max(1, Math.floor(number(quantity))),
+        }));
+
+    if (!items.length) return '';
+
+    const base = getFondekaCommerceSchemeBase();
+    if (items.length === 1) {
+        const params = new URLSearchParams({
+            quantity: String(items[0].quantity),
+            checkout: '1',
+        });
+        return `${base}/products/${encodeURIComponent(items[0].productId)}?${params.toString()}`;
+    }
+
+    const paymentCurrency = String(
+        cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency ||
+        currencies.paymentCurrency ||
+        currencies.billingCurrency ||
+        ''
+    ).trim().toUpperCase();
+    const params = new URLSearchParams({
+        items: JSON.stringify(items),
+    });
+    if (paymentCurrency) params.set('paymentCurrency', paymentCurrency);
+    return `${base}/checkout?${params.toString()}`;
+}
+
 function checkoutPayload(cartItems, buyer, currencies) {
     const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
     const billingCurrency = cartCurrency || currencies.billingCurrency;
@@ -428,6 +543,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [currencies, setCurrencies] = useState({ billingCurrency: seededCurrency, paymentCurrency: seededCurrency });
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [imageGallery, setImageGallery] = useState(null);
+    const [reviews, setReviews] = useState([]);
+    const [activeTab, setActiveTab] = useState('PRODUCTS');
+    const [checkoutSheetOpen, setCheckoutSheetOpen] = useState(false);
+    const [receiptOpen, setReceiptOpen] = useState(false);
+    const [activeProductImageIndex, setActiveProductImageIndex] = useState(0);
     const [quote, setQuote] = useState(null);
     const [paymentReviewOpen, setPaymentReviewOpen] = useState(false);
     const [paymentReviewContext, setPaymentReviewContext] = useState(null);
@@ -444,6 +564,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [cryptoNetworksLoading, setCryptoNetworksLoading] = useState(false);
     const [cryptoNetworksError, setCryptoNetworksError] = useState(null);
     const [selectedCryptoNetworkId, setSelectedCryptoNetworkId] = useState(null);
+    const [isMobileBrowser, setIsMobileBrowser] = useState(false);
+    const [showAppInstallFallback, setShowAppInstallFallback] = useState(false);
     const [countryCode, setCountryCode] = useState(() => normalizeCountryCode(initialCountry));
     const [showCountryPicker, setShowCountryPicker] = useState(false);
     const [countryQuery, setCountryQuery] = useState('');
@@ -502,6 +624,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }, [hasInitialState, load]);
 
     useEffect(() => {
+        if (typeof navigator !== 'undefined') {
+            setIsMobileBrowser(MOBILE_BROWSER_RE.test(navigator.userAgent || ''));
+        }
+    }, []);
+
+    useEffect(() => {
         const storedBuyer = readStoredBuyerDetails();
         if (storedBuyer && hasBuyerDetails(storedBuyer)) {
             setBuyer(storedBuyer);
@@ -515,11 +643,38 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         storeBuyerDetails(buyer);
     }, [buyer, buyerDetailsLoaded]);
 
+    useEffect(() => {
+        const reviewSlug = store?.slug || slug;
+        if (!reviewSlug) {
+            setReviews([]);
+            return undefined;
+        }
+
+        let cancelled = false;
+        setReviews([]);
+        apiFetch(`/public/commerce/marketplace/stores/${encodeURIComponent(reviewSlug)}/reviews?page=0&size=20`)
+            .then((payload) => {
+                if (cancelled) return;
+                setReviews(pageItems(payload).map(normalizeStoreReview).filter(Boolean));
+            })
+            .catch(() => {
+                if (!cancelled) setReviews([]);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [store?.slug, slug]);
+
     const cartItems = useMemo(() => products
         .map((product) => ({ product, quantity: number(cart[product.id]) }))
         .filter((item) => item.quantity > 0), [cart, products]);
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const cartTotal = cartSubtotal(cartItems);
+    const cartCurrency = cartItems[0]?.product?.priceCurrency || currencies.paymentCurrency || currencies.billingCurrency || '';
+    const categories = useMemo(() => storeCategories(store, products), [store, products]);
+    const appCheckoutLink = useMemo(() => commerceAppCheckoutDeepLink(cartItems, currencies), [cartItems, currencies]);
     const paymentMethods = discoveredPaymentMethods;
     const selectedPaymentMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
     const selectedCountry = COUNTRIES_BY_CODE[countryCode] || COUNTRIES_BY_CODE.CD;
@@ -532,6 +687,10 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             country.callingCode.includes(query)
         ));
     }, [countryQuery]);
+
+    useEffect(() => {
+        setShowAppInstallFallback(false);
+    }, [appCheckoutLink]);
 
     const setQuantity = (productId, nextQuantity) => {
         const safeQuantity = Math.max(0, Math.floor(number(nextQuantity)));
@@ -546,6 +705,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
+        setCheckoutSheetOpen(false);
         setOrder(null);
         setShowOrderPaymentView(false);
         setCryptoNetworks([]);
@@ -565,6 +725,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
+        setCheckoutSheetOpen(false);
         setShowOrderPaymentView(false);
         setFlowError(null);
     };
@@ -579,9 +740,25 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
+        setCheckoutSheetOpen(false);
         setShowOrderPaymentView(false);
         setFlowError(null);
     };
+
+    const openFondekaAppCheckout = useCallback(() => {
+        if (!appCheckoutLink) return;
+
+        const startedAt = Date.now();
+        setShowAppInstallFallback(false);
+        window.location.href = appCheckoutLink;
+
+        window.setTimeout(() => {
+            const elapsed = Date.now() - startedAt;
+            if (elapsed < 1800 && !document.hidden) {
+                setShowAppInstallFallback(true);
+            }
+        }, 1500);
+    }, [appCheckoutLink]);
 
     const validate = () => {
         if (!cartItems.length) return 'Choose at least one product.';
@@ -898,9 +1075,20 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     type: 'PAID',
                     reference: order?.reference || '',
                     total: amount(order?.totalAmount ?? order?.paymentAmount, order?.totalCurrency || order?.paymentCurrency),
+                    receipt: {
+                        reference: order?.reference || '',
+                        storeName: store?.name || 'Fondeka Commerce',
+                        date: new Date().toISOString(),
+                        items: cartItems,
+                        totalAmount: order?.totalAmount ?? order?.paymentAmount,
+                        totalCurrency: order?.totalCurrency || order?.paymentCurrency,
+                        customerName: buyer?.name || '',
+                        paidVia: selectedPaymentMethod?.name || '',
+                        status: order?.status || order?.paymentTransactionStatus || 'PAID',
+                    },
                 }
         ));
-    }, [order?.paymentAmount, order?.paymentCurrency, order?.paymentTransactionStatus, order?.reference, order?.status, order?.totalAmount, order?.totalCurrency]);
+    }, [buyer?.name, cartItems, order?.paymentAmount, order?.paymentCurrency, order?.paymentTransactionStatus, order?.reference, order?.status, order?.totalAmount, order?.totalCurrency, selectedPaymentMethod?.name, store?.name]);
 
     if (loading) {
         return <Screen><StateCard title="Loading storefront..." /></Screen>;
@@ -991,8 +1179,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         <PaymentSuccessModal
             reference={paymentPrompt.reference}
             total={paymentPrompt.total}
+            onReceipt={() => setReceiptOpen(true)}
             onClose={() => setPaymentPrompt(null)}
         />
+    ) : null;
+    const receiptModal = receiptOpen && paymentPrompt?.receipt ? (
+        <CommerceReceiptModal receipt={paymentPrompt.receipt} onClose={() => setReceiptOpen(false)} />
     ) : null;
 
     if (order && showOrderPaymentView) {
@@ -1039,11 +1231,16 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         checkout={checkout}
                         flowError={flowError}
                         busy={busy}
+                        appCheckoutLink={appCheckoutLink}
+                        showAppCheckout={isMobileBrowser}
+                        showAppInstallFallback={showAppInstallFallback}
+                        onOpenAppCheckout={openFondekaAppCheckout}
                         onConfirm={reviewPayment}
                     />
                     {countryPicker}
                     {reviewSheet}
                     {paymentPromptModal}
+                    {receiptModal}
 
                     <button
                         type="button"
@@ -1068,111 +1265,21 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     if (directProduct) {
         return (
             <Screen wide>
-                <div className="product-page-layout">
-                    <ProductHero
-                        product={directProduct}
-                        store={store}
-                        onOpenGallery={(startIndex = 0) => setImageGallery({ product: directProduct, index: startIndex })}
-                    />
-
-                    <aside className="checkout-panel product-checkout-panel" aria-label="Checkout">
-                        <div className="section-heading">
-                            <h2>Checkout</h2>
-                            <span>{cartCount} item{cartCount === 1 ? '' : 's'}</span>
-                        </div>
-
-                        <div className="product-quantity-row">
-                            <span>Quantity</span>
-                            <Quantity
-                                quantity={number(cart[directProduct.id])}
-                                onIncrement={() => changeQuantity(directProduct.id, 1)}
-                                onDecrement={() => changeQuantity(directProduct.id, -1)}
-                                disabled={inventoryLabel(directProduct) === 'Out of stock'}
-                            />
-                        </div>
-
-                        <CheckoutPaymentForm
-                            cartItems={cartItems}
-                            buyer={buyer}
-                            setBuyer={updateBuyer}
-                            currencies={currencies}
-                            paymentMethod={paymentMethod}
-                            setPaymentMethod={updatePaymentMethod}
-                            paymentMethods={paymentMethods}
-                            paymentMethodsLoading={paymentMethodsLoading}
-                            paymentMethodsError={paymentMethodsError}
-                            paymentMethodsLoaded={paymentMethodsLoaded}
-                            cryptoNetworks={cryptoNetworks}
-                            cryptoNetworksLoading={cryptoNetworksLoading}
-                            cryptoNetworksError={cryptoNetworksError}
-                            selectedCryptoNetworkId={selectedCryptoNetworkId}
-                            setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
-                            selectedCountry={selectedCountry}
-                            buyerDetailsOpen={buyerDetailsOpen}
-                            setBuyerDetailsOpen={setBuyerDetailsOpen}
-                            onOpenCountryPicker={() => {
-                                setCountryQuery('');
-                                setShowCountryPicker(true);
-                            }}
-                            quote={quote}
-                            checkout={checkout}
-                            flowError={flowError}
-                            busy={busy}
-                            onConfirm={reviewPayment}
-                        />
-                        {countryPicker}
-                        {reviewSheet}
-                        {paymentPromptModal}
-                        {imageGallery && (
-                            <ProductImageGallery
-                                product={imageGallery.product}
-                                index={imageGallery.index}
-                                onIndexChange={(index) => setImageGallery((current) => current ? { ...current, index } : current)}
-                                onClose={() => setImageGallery(null)}
-                            />
-                        )}
-                    </aside>
-                </div>
-            </Screen>
-        );
-    }
-
-    return (
-        <Screen wide>
-            <StoreHeader store={store} />
-
-            <div className="store-layout">
-                <section aria-label="Products">
-                    <div className="section-heading">
-                        <h2>{productLookup ? 'Product' : 'Products'}</h2>
-                        <span>{products.length} listed</span>
-                    </div>
-
-                    {products.length ? (
-                        <div className="product-grid">
-                            {products.map((product) => (
-                                <ProductCard
-                                    key={product.id}
-                                    product={product}
-                                    quantity={number(cart[product.id])}
-                                    onOpen={() => setSelectedProduct(product)}
-                                    onOpenGallery={(startIndex = 0) => setImageGallery({ product, index: startIndex })}
-                                    onIncrement={() => changeQuantity(product.id, 1)}
-                                    onDecrement={() => changeQuantity(product.id, -1)}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <StateCard title="No products yet" message="This store has no storefront products available." />
-                    )}
-                </section>
-
-                <aside className="checkout-panel" aria-label="Checkout">
-                    <div className="section-heading">
-                        <h2>Cart</h2>
-                        <span>{cartCount} item{cartCount === 1 ? '' : 's'}</span>
-                    </div>
-
+                <ProductDetailPage
+                    product={directProduct}
+                    store={store}
+                    quantity={Math.max(1, number(cart[directProduct.id]))}
+                    activeImageIndex={activeProductImageIndex}
+                    onImageChange={setActiveProductImageIndex}
+                    onOpenGallery={(startIndex = 0) => setImageGallery({ product: directProduct, index: startIndex })}
+                    onQuantityChange={(nextQuantity) => setQuantity(directProduct.id, Math.max(1, nextQuantity))}
+                    onPay={() => setCheckoutSheetOpen(true)}
+                />
+                <CheckoutSheet
+                    open={checkoutSheetOpen}
+                    title="Checkout"
+                    onClose={() => setCheckoutSheetOpen(false)}
+                >
                     <CheckoutPaymentForm
                         cartItems={cartItems}
                         buyer={buyer}
@@ -1200,10 +1307,90 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         checkout={checkout}
                         flowError={flowError}
                         busy={busy}
+                        appCheckoutLink={appCheckoutLink}
+                        showAppCheckout={isMobileBrowser}
+                        showAppInstallFallback={showAppInstallFallback}
+                        onOpenAppCheckout={openFondekaAppCheckout}
                         onConfirm={reviewPayment}
                     />
-                </aside>
-            </div>
+                </CheckoutSheet>
+                {countryPicker}
+                {reviewSheet}
+                {paymentPromptModal}
+                {receiptModal}
+                {imageGallery && (
+                    <ProductImageGallery
+                        product={imageGallery.product}
+                        index={imageGallery.index}
+                        onIndexChange={(index) => setImageGallery((current) => current ? { ...current, index } : current)}
+                        onClose={() => setImageGallery(null)}
+                    />
+                )}
+            </Screen>
+        );
+    }
+
+    return (
+        <Screen wide>
+            <StoreProfilePage
+                store={store}
+                products={products}
+                reviews={reviews}
+                categories={categories}
+                activeTab={activeTab}
+                cart={cart}
+                cartCount={cartCount}
+                cartTotal={cartTotal}
+                cartCurrency={cartCurrency}
+                onTabChange={setActiveTab}
+                onProductOpen={(product) => {
+                    const targetSlug = product.slug || product.id;
+                    if (targetSlug && store?.slug) window.location.href = `/stores/${encodeURIComponent(store.slug)}/products/${encodeURIComponent(targetSlug)}`;
+                    else setSelectedProduct(product);
+                }}
+                onProductAdd={(product) => changeQuantity(product.id, 1)}
+                onProductRemove={(product) => changeQuantity(product.id, -1)}
+                onPay={() => setCheckoutSheetOpen(true)}
+            />
+            <CheckoutSheet
+                open={checkoutSheetOpen}
+                title="Checkout"
+                onClose={() => setCheckoutSheetOpen(false)}
+            >
+                    <CheckoutPaymentForm
+                        cartItems={cartItems}
+                        buyer={buyer}
+                        setBuyer={updateBuyer}
+                        currencies={currencies}
+                        paymentMethod={paymentMethod}
+                        setPaymentMethod={updatePaymentMethod}
+                        paymentMethods={paymentMethods}
+                        paymentMethodsLoading={paymentMethodsLoading}
+                        paymentMethodsError={paymentMethodsError}
+                        paymentMethodsLoaded={paymentMethodsLoaded}
+                        cryptoNetworks={cryptoNetworks}
+                        cryptoNetworksLoading={cryptoNetworksLoading}
+                        cryptoNetworksError={cryptoNetworksError}
+                        selectedCryptoNetworkId={selectedCryptoNetworkId}
+                        setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
+                        selectedCountry={selectedCountry}
+                        buyerDetailsOpen={buyerDetailsOpen}
+                        setBuyerDetailsOpen={setBuyerDetailsOpen}
+                        onOpenCountryPicker={() => {
+                            setCountryQuery('');
+                            setShowCountryPicker(true);
+                        }}
+                        quote={quote}
+                        checkout={checkout}
+                        flowError={flowError}
+                        busy={busy}
+                        appCheckoutLink={appCheckoutLink}
+                        showAppCheckout={isMobileBrowser}
+                        showAppInstallFallback={showAppInstallFallback}
+                        onOpenAppCheckout={openFondekaAppCheckout}
+                        onConfirm={reviewPayment}
+                    />
+            </CheckoutSheet>
 
             {selectedProduct && (
                 <ProductDialog
@@ -1226,6 +1413,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             {countryPicker}
             {reviewSheet}
             {paymentPromptModal}
+            {receiptModal}
         </Screen>
     );
 }
@@ -1307,26 +1495,187 @@ function StateCard({ title, message, children }) {
     );
 }
 
-function StoreHeader({ store }) {
+function ShareButton({ label = 'Share', text }) {
+    const handleShare = async () => {
+        const shareUrl = text || (typeof window !== 'undefined' ? window.location.href : '');
+        try {
+            if (navigator.share) {
+                await navigator.share({ url: shareUrl });
+                return;
+            }
+        } catch {
+            return;
+        }
+        await copyToClipboard(shareUrl);
+    };
+
     return (
-        <section className="store-header">
-            {store.bannerUrl && <img className="store-banner" src={store.bannerUrl} alt="" />}
-            <div className="store-header-content">
-                {store.logoUrl ? (
-                    <img className="store-logo" src={store.logoUrl} alt="" />
-                ) : (
-                    <div className="store-logo store-logo-fallback">{initials(store.name)}</div>
-                )}
-                <div>
-                    <h1>{store.name}</h1>
-                    {store.description && <p>{store.description}</p>}
-                    <div className="store-meta">
-                        {store.countryCode && <span>{store.countryCode}</span>}
-                    </div>
-                    <StoreContactActions store={store} />
+        <button type="button" className="profile-icon-button" onClick={handleShare} aria-label={label}>
+            ↗
+        </button>
+    );
+}
+
+function ProfileTopBar({ title = 'Fondeka Commerce', backHref = '/' }) {
+    return (
+        <div className="profile-topbar">
+            <a className="profile-back-button" href={backHref} aria-label="Back">
+                ‹
+            </a>
+            <strong>{title}</strong>
+            <ShareButton />
+        </div>
+    );
+}
+
+function VerifiedBadge({ className = '' }) {
+    return (
+        <span className={`verified-badge${className ? ` ${className}` : ''}`} aria-label="Verified by Fondeka" title="Verified by Fondeka">
+            <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M10 2.4l5.8 2.2v4.1c0 3.8-2.4 7.2-5.8 8.8-3.4-1.6-5.8-5-5.8-8.8V4.6L10 2.4z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                <path d="M6.9 10.1l2 2 4.2-4.4" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+        </span>
+    );
+}
+
+function StoreProfilePage({
+    store,
+    products,
+    reviews,
+    categories,
+    activeTab,
+    cart,
+    cartCount,
+    cartTotal,
+    cartCurrency,
+    onTabChange,
+    onProductOpen,
+    onProductAdd,
+    onProductRemove,
+    onPay,
+}) {
+    const tabs = {
+        PRODUCTS: (
+            products.length ? (
+                <div className="profile-product-grid">
+                    {products.map((product) => (
+                        <ProfileProductCard
+                            key={product.id || product.slug}
+                            product={product}
+                            quantity={number(cart[product.id])}
+                            onOpen={() => onProductOpen(product)}
+                            onAdd={() => onProductAdd(product)}
+                            onRemove={() => onProductRemove(product)}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <StateCard title="No products yet" message="This store has no products available right now." />
+            )
+        ),
+        ABOUT: <AboutPanel store={store} categories={categories} />,
+        REVIEWS: <StoreReviews reviews={reviews} storeName={store?.name} />,
+    };
+
+    return (
+        <div className={`store-profile${cartCount ? ' store-profile--with-cart' : ''}`}>
+            <ProfileTopBar title="Fondeka Commerce" />
+            <StoreProfileHeader store={store} />
+            <StoreTabs activeTab={activeTab} onChange={onTabChange} />
+            <section className="store-tab-panel" aria-label={STORE_TAB_LABELS[activeTab]}>
+                {tabs[activeTab]}
+            </section>
+            {cartCount > 0 && (
+                <StickyCheckoutBar
+                    count={cartCount}
+                    total={amount(cartTotal, cartCurrency)}
+                    onPay={onPay}
+                />
+            )}
+        </div>
+    );
+}
+
+function StoreProfileHeader({ store }) {
+    const verified = isVerifiedStatus(store?.verificationStatus);
+    const memberSince = formatMemberSince(store?.createdAt);
+    const capabilities = storeCapabilities(store);
+
+    return (
+        <section className="store-profile-header">
+            <div className="store-cover">
+                {store?.bannerUrl ? <img src={store.bannerUrl} alt="" /> : null}
+                <div className="store-avatar">
+                    {store?.logoUrl ? <img src={store.logoUrl} alt="" /> : <span>{String(store?.name || 'S').slice(0, 1).toUpperCase()}</span>}
                 </div>
             </div>
+
+            <div className="store-profile-identity">
+                <div className="store-name-line">
+                    <h1>{store?.name || store?.slug || 'Store'}</h1>
+                    {verified ? <VerifiedBadge /> : null}
+                </div>
+                {(memberSince || store?.countryCode) && (
+                    <div className="store-profile-meta">
+                        {memberSince && <span>Membre depuis {memberSince}</span>}
+                        {store?.countryCode && <span className="store-location"><LocationIcon />{store.countryCode}</span>}
+                    </div>
+                )}
+                <StoreContactActions store={store} />
+                {!!capabilities.length && (
+                    <div className="store-capability-row">
+                        {capabilities.map((capability) => (
+                            <span key={capability.key}><i>{capability.icon}</i>{capability.label}</span>
+                        ))}
+                    </div>
+                )}
+            </div>
         </section>
+    );
+}
+
+function StoreTabs({ activeTab, onChange }) {
+    const activeIndex = Math.max(0, STORE_TABS.indexOf(activeTab));
+    return (
+        <div className="store-tabs" role="tablist" aria-label="Store profile">
+            <span className="store-tab-indicator" style={{ transform: `translateX(${activeIndex * 100}%)` }} />
+            {STORE_TABS.map((tab) => (
+                <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab}
+                    className={activeTab === tab ? 'store-tab store-tab--active' : 'store-tab'}
+                    onClick={() => onChange(tab)}
+                >
+                    {STORE_TAB_LABELS[tab]}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function AboutPanel({ store, categories }) {
+    const memberSince = formatMemberSince(store?.createdAt, true);
+    return (
+        <section className="store-info-panel">
+            <h2>À propos</h2>
+            {store?.description && <p>{store.description}</p>}
+            {!!categories.length && <InfoLine label="Categories" value={categories.join(', ')} />}
+            {store?.countryCode && <InfoLine label="Pays" value={store.countryCode} />}
+            {memberSince && <InfoLine label="Membre depuis" value={memberSince} />}
+            {isVerifiedStatus(store?.verificationStatus) && <InfoLine label="Confiance" value="Vérifiée par Fondeka" />}
+        </section>
+    );
+}
+
+function InfoLine({ label, value }) {
+    return (
+        <div className="store-info-line">
+            <span>{label}</span>
+            <strong>{value}</strong>
+        </div>
     );
 }
 
@@ -1342,6 +1691,7 @@ function StoreContactActions({ store, compact = false }) {
                 <div className="store-contact-primary" aria-label="Store contact actions">
                     {contactLinks.map((link) => (
                         <a key={link.key} href={link.href} target={link.key === 'whatsapp' ? '_blank' : undefined} rel={link.key === 'whatsapp' ? 'noreferrer' : undefined}>
+                            {link.key === 'whatsapp' ? <WhatsAppIcon /> : <MailIcon />}
                             {link.label}
                         </a>
                     ))}
@@ -1351,7 +1701,7 @@ function StoreContactActions({ store, compact = false }) {
                 <div className="store-social-links" aria-label="Store social links">
                     {socialLinks.map((link) => (
                         <a key={link.key} href={link.href} target="_blank" rel="noreferrer" aria-label={link.label}>
-                            {link.label}
+                            {link.icon}
                         </a>
                     ))}
                 </div>
@@ -1360,29 +1710,96 @@ function StoreContactActions({ store, compact = false }) {
     );
 }
 
-function ProductCard({ product, quantity, onOpen, onOpenGallery, onIncrement, onDecrement }) {
+function StarRating({ stars, label }) {
+    const safeStars = Math.max(0, Math.min(5, Math.round(number(stars))));
+    return (
+        <div className="star-rating" aria-label={label || `${safeStars} out of 5 stars`}>
+            {Array.from({ length: 5 }).map((_, index) => (
+                <span key={index} className={index < safeStars ? 'star-rating-star--filled' : ''}>★</span>
+            ))}
+        </div>
+    );
+}
+
+function StoreReviews({ reviews, storeName }) {
+    if (!reviews?.length) {
+        return (
+            <section className="store-info-panel">
+                <h2>Reviews</h2>
+                <p>Reviews will appear here when customers start rating this store.</p>
+            </section>
+        );
+    }
+
+    const average = reviews.reduce((sum, review) => sum + review.stars, 0) / reviews.length;
+    const averageLabel = `${average.toFixed(1)} out of 5`;
+
+    return (
+        <section className="store-reviews store-reviews--tab" aria-label="Store reviews">
+            <div className="store-reviews-heading">
+                <div>
+                    <h2>Reviews</h2>
+                    <p>{averageLabel} from {reviews.length} review{reviews.length === 1 ? '' : 's'}</p>
+                </div>
+                <StarRating stars={average} label={averageLabel} />
+            </div>
+            <div className="store-review-grid">
+                {reviews.map((review, index) => (
+                    <article className="store-review-card" key={review.id || index}>
+                        <div className="review-head">
+                            <span className="review-avatar">{initials(review.reviewerName || 'Customer').slice(0, 1)}</span>
+                            <div>
+                                <strong>{review.reviewerName || 'Customer'}</strong>
+                                <div className="review-meta">
+                                    <StarRating stars={review.stars} />
+                                    {review.createdAt && <span>{formatReviewDate(review.createdAt)}</span>}
+                                </div>
+                            </div>
+                        </div>
+                        <p>{review.message}</p>
+                        {review.replyMessage && (
+                            <div className="review-reply">
+                                <strong>Réponse de {review.replyByName || storeName || 'la boutique'}</strong>
+                                <p>{review.replyMessage}</p>
+                                {review.repliedAt && <span>{formatReviewDate(review.repliedAt)}</span>}
+                            </div>
+                        )}
+                    </article>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function ProfileProductCard({ product, quantity, onOpen, onAdd, onRemove }) {
     const out = inventoryLabel(product) === 'Out of stock';
     const images = productImages(product);
     const image = images[0];
     return (
-        <article className="product-card">
+        <article className="profile-product-card">
             <button
-                className="product-preview"
-                onClick={() => image ? onOpenGallery(0) : onOpen()}
-                aria-label={image ? `Zoom ${product.name}` : `View ${product.name}`}
+                type="button"
+                className="profile-product-media"
+                onClick={onOpen}
+                aria-label={`View ${product.name}`}
             >
                 {image ? <img src={image} alt="" /> : initials(product.name)}
-                {images.length > 1 && <span className="product-image-count">{images.length} photos</span>}
             </button>
-            <div className="product-body">
-                <button className="product-title" onClick={onOpen}>{product.name}</button>
-                {product.description && <p>{product.description}</p>}
-                <div className="product-meta">
-                    <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
-                    <span>{inventoryLabel(product)}</span>
+            <div className="profile-product-body">
+                <button type="button" className="profile-product-name" onClick={onOpen}>{product.name || product.slug || 'Product'}</button>
+                <strong className="profile-product-price">{amount(product.priceAmount, product.priceCurrency)}</strong>
+                <div className="profile-product-actions">
+                    {quantity > 0 && (
+                        <>
+                            <button type="button" className="profile-qty-button" onClick={onRemove} disabled={out} aria-label="Decrease quantity">−</button>
+                            <span>{quantity}</span>
+                        </>
+                    )}
+                    <button type="button" className={quantity > 0 ? 'profile-add-button profile-add-button--icon' : 'profile-add-button'} onClick={onAdd} disabled={out}>
+                        {quantity > 0 ? '+' : 'Add'}
+                    </button>
                 </div>
             </div>
-            <Quantity quantity={quantity} onIncrement={onIncrement} onDecrement={onDecrement} disabled={out} />
         </article>
     );
 }
@@ -1393,6 +1810,127 @@ function Quantity({ quantity, onIncrement, onDecrement, disabled }) {
             <button onClick={onDecrement} disabled={disabled || quantity <= 0} aria-label="Decrease quantity">-</button>
             <span>{quantity}</span>
             <button onClick={onIncrement} disabled={disabled} aria-label="Increase quantity">+</button>
+        </div>
+    );
+}
+
+function StickyCheckoutBar({ count, total, onPay }) {
+    return (
+        <div className="sticky-checkout-bar" role="region" aria-label="Checkout">
+            <div>
+                <strong>{count} article{count === 1 ? '' : 's'}</strong>
+                {total && <span>{total}</span>}
+            </div>
+            <button type="button" onClick={onPay}>Payer</button>
+        </div>
+    );
+}
+
+function ProductDetailPage({
+    product,
+    store,
+    quantity,
+    activeImageIndex,
+    onImageChange,
+    onOpenGallery,
+    onQuantityChange,
+    onPay,
+}) {
+    const images = productImages(product);
+    const activeImage = images[activeImageIndex] || images[0] || '';
+    const verified = isVerifiedStatus(product?.storeVerificationStatus || store?.verificationStatus);
+    const storeName = product?.storeName || store?.name || 'Store';
+    const whatsappHref = whatsappLink(store?.whatsappNumber || product?.storeWhatsappNumber || product?.whatsappNumber);
+    const storeHref = store?.slug ? `/stores/${encodeURIComponent(store.slug)}` : '#';
+
+    return (
+        <div className="product-detail-page">
+            <ProfileTopBar title="Product" backHref={storeHref !== '#' ? storeHref : '/'} />
+            <div className="product-detail-layout">
+                <section className="product-detail-media-col">
+                    <div
+                        className="product-detail-media"
+                    >
+                        <button
+                            type="button"
+                            className="product-detail-media-zoom"
+                            onClick={() => activeImage && onOpenGallery(activeImageIndex || 0)}
+                            disabled={!activeImage}
+                            aria-label={activeImage ? `Zoom ${product.name}` : product.name}
+                        >
+                            {activeImage ? <img src={activeImage} alt={product.name || ''} /> : <span>{initials(product.name)}</span>}
+                        </button>
+                        {storeName && (
+                            <a className="media-store-pill" href={storeHref}>
+                                <span>{store?.logoUrl ? <img src={store.logoUrl} alt="" /> : initials(storeName).slice(0, 1)}</span>
+                                <strong>{storeName}</strong>
+                                <i>›</i>
+                            </a>
+                        )}
+                        {verified && <VerifiedBadge className="verified-badge--media" />}
+                    </div>
+                    {images.length > 1 && (
+                        <div className="product-gallery-thumbs" aria-label="Product images">
+                            {images.map((image, index) => (
+                                <button
+                                    key={image}
+                                    type="button"
+                                    className={image === activeImage ? 'product-thumb product-thumb--active' : 'product-thumb'}
+                                    onClick={() => onImageChange(index)}
+                                    aria-label={`Show image ${index + 1}`}
+                                >
+                                    <img src={image} alt="" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                <section className="product-detail-copy">
+                    <div className="product-name-row">
+                        <h1>{product.name || product.slug || 'Product'}</h1>
+                        {whatsappHref && (
+                            <a className="product-whatsapp-button" href={whatsappHref} target="_blank" rel="noreferrer" aria-label="WhatsApp">
+                                <WhatsAppIcon />
+                            </a>
+                        )}
+                    </div>
+                    <div className="product-price-badge">
+                        <span>ⓘ</span>
+                        <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
+                    </div>
+                    {product.description && (
+                        <div className="product-description-section">
+                            <h2>Description</h2>
+                            <p>{product.description}</p>
+                        </div>
+                    )}
+                </section>
+            </div>
+            <div className="product-sticky-buy-row">
+                <div className="product-buy-qty">
+                    <button type="button" onClick={() => onQuantityChange(quantity - 1)} disabled={quantity <= 1} aria-label="Decrease quantity">−</button>
+                    <span>{quantity}</span>
+                    <button type="button" onClick={() => onQuantityChange(quantity + 1)} aria-label="Increase quantity">+</button>
+                </div>
+                <button type="button" className="product-pay-button" onClick={onPay}>Payer</button>
+            </div>
+        </div>
+    );
+}
+
+function CheckoutSheet({ open, title, onClose, children }) {
+    if (!open) return null;
+    return (
+        <div className="checkout-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="checkout-sheet" onClick={(event) => event.stopPropagation()}>
+                <div className="checkout-sheet-handle" aria-hidden="true" />
+                <div className="checkout-sheet-header">
+                    <h2>{title}</h2>
+                    <button type="button" onClick={onClose}>Close</button>
+                </div>
+                {children}
+            </div>
         </div>
     );
 }
@@ -1410,6 +1948,33 @@ function ChevronDownIcon({ className = 'payment-country-chevron' }) {
     return (
         <svg className={className} width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
             <path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+function LocationIcon({ className = 'store-location-icon' }) {
+    return (
+        <svg className={className} width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 21s7-5.5 7-12a7 7 0 1 0-14 0c0 6.5 7 12 7 12z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="12" cy="9" r="2.4" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+    );
+}
+
+function WhatsAppIcon({ className = 'whatsapp-icon' }) {
+    return (
+        <svg className={className} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M20.5 11.8a8.4 8.4 0 0 1-12.4 7.4L4 20.3l1.1-4A8.4 8.4 0 1 1 20.5 11.8z" fill="currentColor" />
+            <path d="M8.6 7.8c.2-.4.4-.5.7-.5h.5c.2 0 .4.1.5.4l.7 1.7c.1.3.1.5-.1.7l-.4.5c-.1.1-.2.3-.1.5.3.6.8 1.2 1.3 1.7.6.5 1.2.9 1.9 1.2.2.1.4 0 .5-.1l.5-.6c.2-.2.4-.3.7-.2l1.7.8c.3.1.4.3.4.6 0 .5-.1 1.1-.5 1.5-.4.4-1 .6-1.7.6-1.1 0-2.5-.5-4-1.5-1.3-.9-2.4-2-3.3-3.3-1-1.5-1.5-2.9-1.5-4 0-.7.2-1.2.6-1.6z" fill="#fff" />
+        </svg>
+    );
+}
+
+function MailIcon({ className = 'mail-icon' }) {
+    return (
+        <svg className={className} width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3.5" y="5.5" width="17" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+            <path d="M4.5 7.5l7.5 5.8 7.5-5.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
 }
@@ -1507,6 +2072,10 @@ function CheckoutPaymentForm({
     checkout,
     flowError,
     busy,
+    appCheckoutLink,
+    showAppCheckout,
+    showAppInstallFallback,
+    onOpenAppCheckout,
     onConfirm,
 }) {
     const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
@@ -1577,6 +2146,15 @@ function CheckoutPaymentForm({
                     </div>
                 </div>
 
+                {showAppCheckout && (
+                    <FondekaAppPaymentPanel
+                        appCheckoutLink={appCheckoutLink}
+                        disabled={!cartItems.length}
+                        showInstallFallback={showAppInstallFallback}
+                        onOpen={onOpenAppCheckout}
+                    />
+                )}
+
                 <PaymentMethodPicker
                     paymentMethod={paymentMethod}
                     setPaymentMethod={setPaymentMethod}
@@ -1633,6 +2211,10 @@ function OrderPaymentPanel({
     checkout,
     flowError,
     busy,
+    appCheckoutLink,
+    showAppCheckout,
+    showAppInstallFallback,
+    onOpenAppCheckout,
     onConfirm,
 }) {
     const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
@@ -1663,6 +2245,14 @@ function OrderPaymentPanel({
                         <small>Fees are checked before payment starts</small>
                     </div>
                 </div>
+                {showAppCheckout && (
+                    <FondekaAppPaymentPanel
+                        appCheckoutLink={appCheckoutLink}
+                        disabled={!payable}
+                        showInstallFallback={showAppInstallFallback}
+                        onOpen={onOpenAppCheckout}
+                    />
+                )}
                 <PaymentMethodPicker
                     paymentMethod={paymentMethod}
                     setPaymentMethod={setPaymentMethod}
@@ -1696,6 +2286,31 @@ function OrderPaymentPanel({
             </section>
 
         </section>
+    );
+}
+
+function FondekaAppPaymentPanel({ appCheckoutLink, disabled, showInstallFallback, onOpen }) {
+    return (
+        <div className="fondeka-app-pay-panel">
+            <div className="fondeka-app-pay-copy">
+                <strong>Fondeka app</strong>
+                <span>Open this checkout in the app and pay with your Fondeka balance or saved rails.</span>
+            </div>
+            <button
+                type="button"
+                className="button primary fondeka-app-pay-button"
+                onClick={onOpen}
+                disabled={disabled || !appCheckoutLink}
+            >
+                Pay with Fondeka
+            </button>
+            {showInstallFallback && (
+                <div className="fondeka-app-pay-fallback">
+                    <p>Fondeka app not installed? Download the app to finish this checkout on mobile.</p>
+                    <a href="/#download">Download the app</a>
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -1889,7 +2504,7 @@ function MobileMoneyPromptModal({ number, hint, onClose }) {
     );
 }
 
-function PaymentSuccessModal({ reference, total, onClose }) {
+function PaymentSuccessModal({ reference, total, onReceipt, onClose }) {
     return (
         <div className="payment-action-backdrop payment-success-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
             <div className="payment-action-modal payment-success-modal" onClick={(event) => event.stopPropagation()}>
@@ -1928,6 +2543,52 @@ function PaymentSuccessModal({ reference, total, onClose }) {
                     )}
                 </div>
                 <button type="button" className="payment-success-done" onClick={onClose}>Done</button>
+                <button type="button" className="payment-success-receipt-button" onClick={onReceipt}>Reçu</button>
+            </div>
+        </div>
+    );
+}
+
+function CommerceReceiptModal({ receipt, onClose }) {
+    const paidAt = receipt?.date ? new Date(receipt.date) : new Date();
+    const paidAtLabel = Number.isNaN(paidAt.getTime()) ? '' : paidAt.toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+    const items = Array.isArray(receipt?.items) ? receipt.items : [];
+
+    return (
+        <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="commerce-receipt" onClick={(event) => event.stopPropagation()}>
+                <div className="commerce-receipt-head">
+                    <div className="brand-mark" aria-hidden="true" />
+                    <span>REÇU</span>
+                </div>
+                <div className="commerce-receipt-store">
+                    <strong>{receipt?.storeName || 'Fondeka Commerce'}</strong>
+                    {paidAtLabel && <span>{paidAtLabel}</span>}
+                </div>
+                {receipt?.reference && <div className="commerce-receipt-reference">{receipt.reference}</div>}
+                <div className="commerce-receipt-items">
+                    {items.map(({ product, quantity }) => (
+                        <div key={product?.id || product?.slug || product?.name}>
+                            <span>{product?.name || 'Product'} × {quantity}</span>
+                            <strong>{amount(number(product?.priceAmount) * number(quantity), product?.priceCurrency)}</strong>
+                        </div>
+                    ))}
+                </div>
+                <div className="commerce-receipt-total">
+                    <span>Total</span>
+                    <strong>{amount(receipt?.totalAmount, receipt?.totalCurrency)}</strong>
+                </div>
+                {receipt?.customerName && <InfoLine label="Client" value={receipt.customerName} />}
+                {receipt?.paidVia && <InfoLine label="Paid via" value={receipt.paidVia} />}
+                {receipt?.status && <div className="commerce-receipt-status">{receipt.status}</div>}
+                <div className="commerce-receipt-footer">
+                    <span>Powered by</span>
+                    <strong>FONDEKA</strong>
+                </div>
+                <button type="button" className="payment-success-done" onClick={onClose}>Close</button>
             </div>
         </div>
     );
