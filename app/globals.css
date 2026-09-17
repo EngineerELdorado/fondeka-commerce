@@ -2111,6 +2111,12 @@ button:disabled {
     gap: 8px;
 }
 
+.payment-method-accordion-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .payment-method-accordion-header {
     width: 100%;
     min-height: 44px;
@@ -2438,39 +2444,90 @@ button:disabled {
     margin-top: 12px;
 }
 
+.payment-actions--scoped {
+    margin-top: 2px;
+}
+
+.payment-actions--scoped .button {
+    width: 100%;
+}
+
 .fondeka-app-pay-panel {
     display: flex;
     flex-direction: column;
+    gap: 9px;
+    margin-top: 14px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.fondeka-app-pay-separator {
+    display: flex;
+    align-items: center;
     gap: 10px;
-    margin-bottom: 12px;
-    padding: 12px;
-    border: 1px solid rgba(79, 128, 92, 0.22);
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.fondeka-app-pay-separator::before,
+.fondeka-app-pay-separator::after {
+    content: "";
+    height: 1px;
+    flex: 1;
+    background: #e2e8f0;
+}
+
+.fondeka-app-pay-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid rgba(15, 23, 42, 0.1);
     border-radius: 8px;
-    background: linear-gradient(180deg, #f7fbf8, #ffffff);
+    padding: 10px;
+    background: #f8fafc;
 }
 
 .fondeka-app-pay-copy {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
+    min-width: 0;
 }
 
 .fondeka-app-pay-copy strong {
-    color: var(--ink);
-    font-size: 15px;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.2;
 }
 
 .fondeka-app-pay-copy span {
     color: var(--muted);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     line-height: 1.35;
 }
 
 .fondeka-app-pay-button {
-    width: 100%;
-    min-height: 52px;
-    font-size: 16px;
+    min-height: 38px;
+    border: 1px solid rgba(15, 23, 42, 0.18);
+    border-radius: 8px;
+    padding: 0 12px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 900;
+    box-shadow: none;
+    white-space: nowrap;
+}
+
+.fondeka-app-pay-button:hover:not(:disabled) {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #fff;
 }
 
 .fondeka-app-pay-fallback {
@@ -2501,7 +2558,7 @@ button:disabled {
 .payment-review-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 60;
+    z-index: 100;
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -2631,7 +2688,7 @@ button:disabled {
 .payment-action-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 70;
+    z-index: 110;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3063,7 +3120,7 @@ button:disabled {
 .country-sheet-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 40;
+    z-index: 120;
     display: flex;
     align-items: flex-end;
     justify-content: center;

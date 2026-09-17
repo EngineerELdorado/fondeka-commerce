@@ -28,6 +28,8 @@ export default function DownloadAppButton({
     desktopTitle = 'Scan and install Fondeka',
     desktopBody = 'Use the app for stores, payments, wallets, cards, bills, airtime, and more.',
     desktopCta = 'Open store page',
+    qrPlayAlt = 'QR code for Google Play',
+    qrAppleAlt = 'QR code for the App Store',
     className = '',
     variant = 'default',
     trackingId,
@@ -120,7 +122,7 @@ export default function DownloadAppButton({
                         className="download-qr"
                         onClick={() => setOpen(false)}
                     >
-                        <img src={qrPlay} alt="QR code for Google Play" loading="lazy" />
+                        <img src={qrPlay} alt={qrPlayAlt} loading="lazy" />
                         <span><PlayIcon /> Google Play</span>
                     </a>
                     <a
@@ -130,7 +132,7 @@ export default function DownloadAppButton({
                         className="download-qr"
                         onClick={() => setOpen(false)}
                     >
-                        <img src={qrApple} alt="QR code for the App Store" loading="lazy" />
+                        <img src={qrApple} alt={qrAppleAlt} loading="lazy" />
                         <span><AppleIcon /> App Store</span>
                     </a>
                     <a

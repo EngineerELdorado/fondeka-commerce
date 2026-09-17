@@ -8,6 +8,15 @@ const landingCopy = {
             faq: 'FAQ',
             download: 'Download app',
         },
+        aria: {
+            siteNav: 'Fondeka Commerce',
+            primaryNav: 'Primary navigation',
+            downloadBenefits: 'Download benefits',
+            languageSelector: 'Language selector',
+            home: 'Fondeka Commerce home',
+            qrPlay: 'QR code for Google Play',
+            qrApple: 'QR code for the App Store',
+        },
         seo: {
             title: 'Fondeka Commerce | SaaS Stores, POS, and Payments for African Merchants',
             description:
@@ -131,6 +140,15 @@ const landingCopy = {
             workflow: 'Parcours',
             faq: 'FAQ',
             download: 'Télécharger',
+        },
+        aria: {
+            siteNav: 'Fondeka Commerce',
+            primaryNav: 'Navigation principale',
+            downloadBenefits: 'Avantages du téléchargement',
+            languageSelector: 'Sélecteur de langue',
+            home: 'Accueil Fondeka Commerce',
+            qrPlay: 'QR code pour Google Play',
+            qrApple: 'QR code pour l’App Store',
         },
         seo: {
             title: 'Fondeka Commerce | Boutiques SaaS, POS et Paiements pour Marchands Africains',
@@ -347,9 +365,9 @@ export default async function Home({ searchParams }) {
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
 
-            <header className="landing-nav commerce-shell" aria-label="Fondeka Commerce">
+            <header className="landing-nav commerce-shell" aria-label={copy.aria.siteNav}>
                 <Brand locale={locale} />
-                <nav className="landing-nav-links" aria-label="Primary navigation">
+                <nav className="landing-nav-links" aria-label={copy.aria.primaryNav}>
                     <a href="#platform">{copy.nav.platform}</a>
                     <a href="#workflow">{copy.nav.workflow}</a>
                     <a href="#faq">{copy.nav.faq}</a>
@@ -363,6 +381,8 @@ export default async function Home({ searchParams }) {
                         desktopTitle={copy.cta.desktopTitle}
                         desktopBody={copy.cta.desktopBody}
                         desktopCta={copy.cta.desktopCta}
+                        qrPlayAlt={copy.aria.qrPlay}
+                        qrAppleAlt={copy.aria.qrApple}
                         className="landing-nav-action"
                         trackingId="landing-nav-download"
                     />
@@ -383,6 +403,8 @@ export default async function Home({ searchParams }) {
                                 desktopTitle={copy.cta.desktopTitle}
                                 desktopBody={copy.cta.desktopBody}
                                 desktopCta={copy.cta.desktopCta}
+                                qrPlayAlt={copy.aria.qrPlay}
+                                qrAppleAlt={copy.aria.qrApple}
                                 variant="hero"
                                 trackingId="landing-hero-download"
                             />
@@ -406,6 +428,8 @@ export default async function Home({ searchParams }) {
                         desktopTitle={copy.cta.desktopTitle}
                         desktopBody={copy.cta.desktopBody}
                         desktopCta={copy.cta.desktopCta}
+                        qrPlayAlt={copy.aria.qrPlay}
+                        qrAppleAlt={copy.aria.qrApple}
                         ariaLabel={copy.cta.button}
                         trackingId="landing-hero-image-download"
                     >
@@ -504,7 +528,7 @@ export default async function Home({ searchParams }) {
                     <p className="eyebrow">{copy.cta.eyebrow}</p>
                     <h2>{copy.cta.title}</h2>
                     <p>{copy.cta.text}</p>
-                    <div className="download-points" aria-label="Download benefits">
+                    <div className="download-points" aria-label={copy.aria.downloadBenefits}>
                         {copy.cta.points.map((point) => (
                             <span key={point}>{point}</span>
                         ))}
@@ -518,6 +542,8 @@ export default async function Home({ searchParams }) {
                     desktopTitle={copy.cta.desktopTitle}
                     desktopBody={copy.cta.desktopBody}
                     desktopCta={copy.cta.desktopCta}
+                    qrPlayAlt={copy.aria.qrPlay}
+                    qrAppleAlt={copy.aria.qrApple}
                     trackingId="commerce-download-cta"
                 />
             </section>
@@ -526,8 +552,9 @@ export default async function Home({ searchParams }) {
 }
 
 function LanguageSwitcher({ activeLocale }) {
+    const copy = contentFor(activeLocale);
     return (
-        <div className="language-switcher" aria-label="Language selector">
+        <div className="language-switcher" aria-label={copy.aria.languageSelector}>
             {Object.keys(languageNames).map((locale) => (
                 <a
                     key={locale}
@@ -544,8 +571,9 @@ function LanguageSwitcher({ activeLocale }) {
 }
 
 function Brand({ locale }) {
+    const copy = contentFor(locale);
     return (
-        <a className="brand brand-link" href={pathForLocale(locale)} aria-label="Fondeka Commerce home">
+        <a className="brand brand-link" href={pathForLocale(locale)} aria-label={copy.aria.home}>
             <span className="brand-mark" aria-hidden="true" />
             <strong>Fondeka Commerce</strong>
         </a>

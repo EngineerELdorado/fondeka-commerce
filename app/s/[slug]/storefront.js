@@ -43,6 +43,379 @@ const STORE_TAB_LABELS = {
     ABOUT: 'About',
     REVIEWS: 'Reviews',
 };
+const FORMAT_LOCALE = 'en-US';
+const COMMERCE_MESSAGES = {
+    en: {
+        paymentTypeLabels: {
+            MOBILE_MONEY: 'Mobile money',
+            CRYPTO: 'Crypto',
+            CARD: 'Cards',
+            BANK_TRANSFER: 'Bank transfer',
+            WALLET: 'Wallet',
+            BALANCE: 'Wallet',
+            OTHER: 'Other',
+        },
+        storeTabs: { PRODUCTS: 'Products', ABOUT: 'About', REVIEWS: 'Reviews' },
+        loadingStorefront: 'Loading storefront...',
+        commerceUnavailable: 'Commerce unavailable',
+        storeNotFound: 'Store not found',
+        unableToLoadStorefront: 'Unable to load storefront',
+        retry: 'Retry',
+        completePayment: 'Complete payment',
+        feesChecked: 'Fees are checked before payment starts.',
+        orderReference: 'Order reference',
+        totalAmount: 'Total amount',
+        backToStore: 'Back to store',
+        checkout: 'Checkout',
+        product: 'Product',
+        fondekaCommerce: 'Fondeka Commerce',
+        share: 'Share',
+        back: 'Back',
+        verifiedByFondeka: 'Verified by Fondeka',
+        noProductsTitle: 'No products yet',
+        noProductsBody: 'This store has no products available right now.',
+        memberSince: 'Member since {date}',
+        about: 'About',
+        categories: 'Categories',
+        country: 'Country',
+        trust: 'Trust',
+        reviews: 'Reviews',
+        reviewsEmpty: 'Reviews will appear here when customers start rating this store.',
+        reviewsSummary: '{rating} out of 5 from {count} {reviewLabel}',
+        reviewSingular: 'review',
+        reviewPlural: 'reviews',
+        customer: 'Customer',
+        replyFrom: 'Reply from {name}',
+        store: 'Store',
+        add: 'Add',
+        decreaseQuantity: 'Decrease quantity',
+        increaseQuantity: 'Increase quantity',
+        itemSingular: 'item',
+        itemPlural: 'items',
+        pay: 'Pay',
+        description: 'Description',
+        close: 'Close',
+        name: 'Name',
+        buyerName: 'Buyer name',
+        email: 'Email',
+        phone: 'Phone',
+        buyer: 'Buyer',
+        noPhoneSaved: 'No phone saved',
+        edit: 'Edit',
+        useTheseDetails: 'Use these details',
+        payment: 'Payment',
+        orderPayment: 'Order payment',
+        orderTotal: 'Order total',
+        lineItemSingular: 'line item',
+        lineItemPlural: 'line items',
+        noItemsSelected: 'No items selected',
+        chooseProducts: 'Choose products to start a checkout.',
+        estimatedSubtotal: 'Estimated subtotal',
+        buyerDetails: 'Buyer details',
+        buyerDetailsHelp: 'Used for confirmation and payment follow-up',
+        howToPay: 'How to pay',
+        paymentMethod: 'Payment method',
+        checkoutAmount: 'Checkout amount',
+        amountBeforeFees: 'Amount before Fondeka payment fees',
+        amountToFund: 'Amount to fund',
+        payWith: 'Pay with',
+        countryFallback: 'Country',
+        loadingPaymentMethods: 'Loading payment methods...',
+        noPaymentMethods: 'No payment methods are available for this country yet.',
+        startPayment: 'Start payment',
+        startingPayment: 'Starting payment',
+        or: 'Or',
+        payWithFondekaApp: 'Pay with Fondeka app',
+        fondekaAppHelp: 'Use your app balance or saved rails.',
+        openApp: 'Open app',
+        appInstallFallback: 'Fondeka app not installed? Download the app to finish this checkout on mobile.',
+        downloadApp: 'Download the app',
+        mobileMoneyPhone: 'Mobile Money phone number',
+        countryCode: 'Country code',
+        confirmOnPhone: 'Confirm on your phone',
+        mobileMoneyPrompt: 'We sent a Mobile Money payment request to {target}. Approve it on your phone to complete the order.',
+        orderConfirmed: 'Order confirmed',
+        paymentReceived: 'Payment received',
+        paymentReceivedBody: 'Your payment is confirmed and the merchant has been notified.',
+        totalPaid: 'Total paid',
+        order: 'Order',
+        done: 'Done',
+        receipt: 'Receipt',
+        receiptBadge: 'RECEIPT',
+        client: 'Customer',
+        paidVia: 'Paid via',
+        poweredBy: 'Powered by',
+        sendCryptoPayment: 'Send crypto payment',
+        qrUnavailable: 'QR unavailable',
+        amount: 'Amount',
+        network: 'Network',
+        expires: 'Expires',
+        address: 'Address',
+        copyAddress: 'Copy address',
+        openInvoice: 'Open invoice',
+        reviewPayment: 'Review payment',
+        fees: 'Fees',
+        totalToPay: 'Total to pay',
+        railAmount: 'Rail amount',
+        method: 'Method',
+        account: 'Account',
+        submitting: 'Submitting...',
+        confirmPayment: 'Confirm payment',
+        loadingCryptoNetworks: 'Loading crypto networks...',
+        noCryptoNetworks: 'No crypto networks are available for this method.',
+        chooseCountry: 'Choose country',
+        searchCountry: 'Search country',
+        noCountriesFound: 'No countries found.',
+        unavailableFallback: 'Fondeka Commerce is not available yet.',
+        fee: 'Fee',
+        billingAmount: 'Billing amount',
+        paymentAmount: 'Payment amount',
+        paymentCollected: 'Payment collected',
+        orderPaymentReceived: 'Your order payment has been received.',
+        waitingForPayment: 'Waiting for payment',
+        imageGalleryClose: 'Close image gallery',
+        previousImage: 'Previous image',
+        nextImage: 'Next image',
+        chooseImage: 'Choose image',
+        productImages: 'Product images',
+        photos: 'photos',
+        noDescription: 'No description provided.',
+        available: 'Available',
+        outOfStock: 'Out of stock',
+        availableQuantity: '{quantity} available',
+        chooseAtLeastOneProduct: 'Choose at least one product.',
+        billingCurrencyRequired: 'Billing currency is required.',
+        paymentCurrencyRequired: 'Payment currency is required.',
+        methodNotConfigured: '{method} is not configured for web checkout yet.',
+        buyerPhoneRequired: 'Buyer phone is required for Mobile Money.',
+        chooseCryptoNetwork: 'Choose a crypto network.',
+        unableToLoadPaymentMethods: 'Unable to load payment methods.',
+        noPaymentMethodAvailable: 'No payment method is available for this checkout.',
+        unableToCheckFees: 'Unable to check payment fees.',
+        unableToStartPayment: 'Unable to start payment.',
+        unableToLoadCryptoNetworks: 'Unable to load crypto networks.',
+        somethingWentWrong: 'Something went wrong.',
+        loading: 'Loading',
+        continue: 'Continue',
+        storeProfile: 'Store profile',
+        storeContactActions: 'Store contact actions',
+        storeSocialLinks: 'Store social links',
+        starRating: '{rating} out of 5 stars',
+        viewProduct: 'View {name}',
+        zoomProduct: 'Zoom {name}',
+        showImage: 'Show image {number}',
+        viewImageOf: 'View image {number} of {total}',
+        yourPhone: 'your phone',
+        pendingPayment: 'PENDING_PAYMENT',
+        total: 'Total',
+        convertedFromTo: 'Converted from {source} to {target}.',
+        provider: 'Provider {provider}.',
+        webPaymentPending: 'Complete the payment to continue. We will update this page automatically.',
+        merchant: 'Fondeka merchant',
+        delivery: 'Delivery',
+        securePayments: 'Secure payments',
+        support: 'Support',
+    },
+    fr: {
+        paymentTypeLabels: {
+            MOBILE_MONEY: 'Mobile money',
+            CRYPTO: 'Crypto',
+            CARD: 'Cartes',
+            BANK_TRANSFER: 'Virement bancaire',
+            WALLET: 'Portefeuille',
+            BALANCE: 'Portefeuille',
+            OTHER: 'Autre',
+        },
+        storeTabs: { PRODUCTS: 'Produits', ABOUT: 'À propos', REVIEWS: 'Avis' },
+        loadingStorefront: 'Chargement de la boutique...',
+        commerceUnavailable: 'Boutique indisponible',
+        storeNotFound: 'Boutique introuvable',
+        unableToLoadStorefront: 'Impossible de charger la boutique',
+        retry: 'Réessayer',
+        completePayment: 'Finaliser le paiement',
+        feesChecked: 'Les frais sont vérifiés avant le lancement du paiement.',
+        orderReference: 'Référence de commande',
+        totalAmount: 'Montant total',
+        backToStore: 'Retour à la boutique',
+        checkout: 'Paiement',
+        product: 'Produit',
+        fondekaCommerce: 'Fondeka Commerce',
+        share: 'Partager',
+        back: 'Retour',
+        verifiedByFondeka: 'Vérifiée par Fondeka',
+        noProductsTitle: 'Aucun produit pour le moment',
+        noProductsBody: 'Cette boutique n’a aucun produit disponible pour le moment.',
+        memberSince: 'Membre depuis {date}',
+        about: 'À propos',
+        categories: 'Catégories',
+        country: 'Pays',
+        trust: 'Confiance',
+        reviews: 'Avis',
+        reviewsEmpty: 'Les avis apparaîtront ici lorsque les clients commenceront à noter cette boutique.',
+        reviewsSummary: '{rating} sur 5 selon {count} {reviewLabel}',
+        reviewSingular: 'avis',
+        reviewPlural: 'avis',
+        customer: 'Client',
+        replyFrom: 'Réponse de {name}',
+        store: 'la boutique',
+        add: 'Ajouter',
+        decreaseQuantity: 'Diminuer la quantité',
+        increaseQuantity: 'Augmenter la quantité',
+        itemSingular: 'article',
+        itemPlural: 'articles',
+        pay: 'Payer',
+        description: 'Description',
+        close: 'Fermer',
+        name: 'Nom',
+        buyerName: 'Nom du client',
+        email: 'Email',
+        phone: 'Téléphone',
+        buyer: 'Client',
+        noPhoneSaved: 'Aucun téléphone enregistré',
+        edit: 'Modifier',
+        useTheseDetails: 'Utiliser ces informations',
+        payment: 'Paiement',
+        orderPayment: 'Paiement de la commande',
+        orderTotal: 'Total de la commande',
+        lineItemSingular: 'ligne',
+        lineItemPlural: 'lignes',
+        noItemsSelected: 'Aucun article sélectionné',
+        chooseProducts: 'Choisissez des produits pour démarrer le paiement.',
+        estimatedSubtotal: 'Sous-total estimé',
+        buyerDetails: 'Informations client',
+        buyerDetailsHelp: 'Utilisées pour la confirmation et le suivi du paiement',
+        howToPay: 'Mode de paiement',
+        paymentMethod: 'Méthode de paiement',
+        checkoutAmount: 'Montant du paiement',
+        amountBeforeFees: 'Montant avant les frais Fondeka',
+        amountToFund: 'Montant à financer',
+        payWith: 'Payer avec',
+        countryFallback: 'Pays',
+        loadingPaymentMethods: 'Chargement des méthodes de paiement...',
+        noPaymentMethods: 'Aucune méthode de paiement n’est encore disponible pour ce pays.',
+        startPayment: 'Démarrer le paiement',
+        startingPayment: 'Démarrage du paiement',
+        or: 'Ou',
+        payWithFondekaApp: 'Payer avec l’app Fondeka',
+        fondekaAppHelp: 'Utilisez votre solde ou vos moyens enregistrés.',
+        openApp: 'Ouvrir l’app',
+        appInstallFallback: 'L’app Fondeka n’est pas installée ? Téléchargez l’app pour terminer ce paiement sur mobile.',
+        downloadApp: 'Télécharger l’app',
+        mobileMoneyPhone: 'Numéro Mobile Money',
+        countryCode: 'Indicatif pays',
+        confirmOnPhone: 'Confirmez sur votre téléphone',
+        mobileMoneyPrompt: 'Nous avons envoyé une demande de paiement Mobile Money à {target}. Validez-la sur votre téléphone pour terminer la commande.',
+        orderConfirmed: 'Commande confirmée',
+        paymentReceived: 'Paiement reçu',
+        paymentReceivedBody: 'Votre paiement est confirmé et le marchand a été notifié.',
+        totalPaid: 'Total payé',
+        order: 'Commande',
+        done: 'Terminé',
+        receipt: 'Reçu',
+        receiptBadge: 'REÇU',
+        client: 'Client',
+        paidVia: 'Payé via',
+        poweredBy: 'Propulsé par',
+        sendCryptoPayment: 'Envoyer le paiement crypto',
+        qrUnavailable: 'QR indisponible',
+        amount: 'Montant',
+        network: 'Réseau',
+        expires: 'Expire',
+        address: 'Adresse',
+        copyAddress: 'Copier l’adresse',
+        openInvoice: 'Ouvrir la facture',
+        reviewPayment: 'Vérifier le paiement',
+        fees: 'Frais',
+        totalToPay: 'Total à payer',
+        railAmount: 'Montant à payer',
+        method: 'Méthode',
+        account: 'Compte',
+        submitting: 'Envoi...',
+        confirmPayment: 'Confirmer le paiement',
+        loadingCryptoNetworks: 'Chargement des réseaux crypto...',
+        noCryptoNetworks: 'Aucun réseau crypto n’est disponible pour cette méthode.',
+        chooseCountry: 'Choisir un pays',
+        searchCountry: 'Rechercher un pays',
+        noCountriesFound: 'Aucun pays trouvé.',
+        unavailableFallback: 'Fondeka Commerce n’est pas encore disponible.',
+        fee: 'Frais',
+        billingAmount: 'Montant facturé',
+        paymentAmount: 'Montant du paiement',
+        paymentCollected: 'Paiement encaissé',
+        orderPaymentReceived: 'Le paiement de votre commande a été reçu.',
+        waitingForPayment: 'En attente du paiement',
+        imageGalleryClose: 'Fermer la galerie',
+        previousImage: 'Image précédente',
+        nextImage: 'Image suivante',
+        chooseImage: 'Choisir une image',
+        productImages: 'Images du produit',
+        photos: 'photos',
+        noDescription: 'Aucune description fournie.',
+        available: 'Disponible',
+        outOfStock: 'Rupture de stock',
+        availableQuantity: '{quantity} disponible(s)',
+        chooseAtLeastOneProduct: 'Choisissez au moins un produit.',
+        billingCurrencyRequired: 'La devise de facturation est obligatoire.',
+        paymentCurrencyRequired: 'La devise de paiement est obligatoire.',
+        methodNotConfigured: '{method} n’est pas encore configurée pour le paiement web.',
+        buyerPhoneRequired: 'Le téléphone du client est obligatoire pour Mobile Money.',
+        chooseCryptoNetwork: 'Choisissez un réseau crypto.',
+        unableToLoadPaymentMethods: 'Impossible de charger les méthodes de paiement.',
+        noPaymentMethodAvailable: 'Aucune méthode de paiement n’est disponible pour ce paiement.',
+        unableToCheckFees: 'Impossible de vérifier les frais.',
+        unableToStartPayment: 'Impossible de démarrer le paiement.',
+        unableToLoadCryptoNetworks: 'Impossible de charger les réseaux crypto.',
+        somethingWentWrong: 'Une erreur est survenue.',
+        loading: 'Chargement',
+        continue: 'Continuer',
+        storeProfile: 'Profil de la boutique',
+        storeContactActions: 'Actions de contact',
+        storeSocialLinks: 'Liens sociaux',
+        starRating: '{rating} sur 5 étoiles',
+        viewProduct: 'Voir {name}',
+        zoomProduct: 'Agrandir {name}',
+        showImage: 'Afficher l’image {number}',
+        viewImageOf: 'Voir l’image {number} sur {total}',
+        yourPhone: 'votre téléphone',
+        pendingPayment: 'PAIEMENT_EN_ATTENTE',
+        total: 'Total',
+        convertedFromTo: 'Converti de {source} vers {target}.',
+        provider: 'Fournisseur {provider}.',
+        webPaymentPending: 'Terminez le paiement pour continuer. Cette page se mettra à jour automatiquement.',
+        merchant: 'Marchand Fondeka',
+        delivery: 'Livraison',
+        securePayments: 'Paiements sécurisés',
+        support: 'Support',
+    },
+};
+const CommerceMessagesContext = React.createContext(COMMERCE_MESSAGES.en);
+
+function normalizeCommerceLanguage(value) {
+    const language = String(value || '').trim().toLowerCase().split(/[-_]/)[0];
+    return language === 'fr' ? 'fr' : 'en';
+}
+
+function detectCommerceLanguage() {
+    if (typeof navigator === 'undefined') return 'en';
+    const candidates = Array.isArray(navigator.languages) && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language].filter(Boolean);
+    for (const candidate of candidates) {
+        const language = normalizeCommerceLanguage(candidate);
+        if (language === 'fr' || language === 'en') return language;
+    }
+    return 'en';
+}
+
+function interpolate(message, values = {}) {
+    return String(message || '').replace(/\{(\w+)\}/g, (_, key) => (
+        values[key] == null ? '' : String(values[key])
+    ));
+}
+
+function useCommerceMessages() {
+    return React.useContext(CommerceMessagesContext);
+}
 
 function pageItems(payload) {
     if (Array.isArray(payload)) return payload;
@@ -60,7 +433,7 @@ function number(value) {
 function amount(value, currency) {
     const code = String(currency || '').trim().toUpperCase();
     const n = number(value);
-    const formatted = n.toLocaleString(undefined, {
+    const formatted = n.toLocaleString(FORMAT_LOCALE, {
         minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
         maximumFractionDigits: 2,
     });
@@ -106,7 +479,7 @@ function formatCryptoPaymentAmount(details, fallback) {
     if (value == null || value === '') return fallback || '';
     const numeric = Number(value);
     const formatted = Number.isFinite(numeric)
-        ? numeric.toLocaleString(undefined, { maximumFractionDigits: 8 })
+        ? numeric.toLocaleString(FORMAT_LOCALE, { maximumFractionDigits: 8 })
         : String(value);
     return currency ? `${formatted} ${currency}` : formatted;
 }
@@ -115,7 +488,7 @@ function formatExpiry(value) {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString(undefined, {
+    return date.toLocaleString(FORMAT_LOCALE, {
         dateStyle: 'medium',
         timeStyle: 'short',
     });
@@ -125,7 +498,7 @@ function formatReviewDate(value) {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleDateString(FORMAT_LOCALE, {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -136,7 +509,7 @@ function formatMemberSince(value, long = false) {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(FORMAT_LOCALE, {
         month: long ? 'long' : 'short',
         year: 'numeric',
     }).format(date);
@@ -206,11 +579,11 @@ function storeCategories(store, products = []) {
     return Array.from(new Set(values)).slice(0, 3);
 }
 
-function storeCapabilities(store) {
+function storeCapabilities(store, messages = COMMERCE_MESSAGES.en) {
     return [
-        store?.deliveryEnabled ? { key: 'delivery', icon: '↗', label: 'Delivery' } : null,
-        store?.securePayments ? { key: 'secure', icon: '✓', label: 'Secure payments' } : null,
-        store?.supportEnabled ? { key: 'support', icon: '•', label: 'Support' } : null,
+        store?.deliveryEnabled ? { key: 'delivery', icon: '↗', label: messages.delivery } : null,
+        store?.securePayments ? { key: 'secure', icon: '✓', label: messages.securePayments } : null,
+        store?.supportEnabled ? { key: 'support', icon: '•', label: messages.support } : null,
     ].filter(Boolean);
 }
 
@@ -370,11 +743,11 @@ function combinePhoneNumber(country, localDigits) {
     return digits ? `+${callingCode}${digits}` : '';
 }
 
-function inventoryLabel(product) {
-    if (String(product?.inventoryPolicy || '').toUpperCase() !== 'TRACKED') return 'Available';
+function inventoryLabel(product, messages = COMMERCE_MESSAGES.en) {
+    if (String(product?.inventoryPolicy || '').toUpperCase() !== 'TRACKED') return messages.available;
     const quantity = number(product?.inventoryQuantity);
-    if (quantity <= 0) return 'Out of stock';
-    return `${amount(quantity, '')} available`;
+    if (quantity <= 0) return messages.outOfStock;
+    return interpolate(messages.availableQuantity, { quantity: amount(quantity, '') });
 }
 
 function firstCurrency(products) {
@@ -468,6 +841,22 @@ function cartSubtotal(cartItems) {
     ), 0);
 }
 
+function cartTotalsByCurrency(cartItems) {
+    return cartItems.reduce((totals, { product, quantity }) => {
+        const currency = String(product?.priceCurrency || '').trim().toUpperCase();
+        if (!currency) return totals;
+        totals[currency] = (totals[currency] || 0) + number(product.priceAmount) * number(quantity);
+        return totals;
+    }, {});
+}
+
+function formatCartTotals(cartItems) {
+    const totals = cartTotalsByCurrency(cartItems);
+    return Object.entries(totals)
+        .map(([currency, total]) => amount(total, currency))
+        .join(' + ');
+}
+
 function idempotencyKey(prefix = 'commerce-payment') {
     return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -533,6 +922,7 @@ function feeQuotePayload(feeQuote, order, paymentMethod) {
 export default function Storefront({ slug, productLookup, productSlug, initialStore = null, initialProducts = null, initialCart = null, initialLoadError = null, initialCountry = 'CD' }) {
     const seededProducts = Array.isArray(initialProducts) ? initialProducts : [];
     const hasInitialState = !!initialStore || seededProducts.length > 0 || !!initialLoadError;
+    const [language, setLanguage] = useState('en');
     const [store, setStore] = useState(initialStore);
     const [products, setProducts] = useState(seededProducts);
     const [cart, setCart] = useState(initialCart || {});
@@ -574,6 +964,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [busy, setBusy] = useState(false);
     const [loadError, setLoadError] = useState(initialLoadError);
     const [flowError, setFlowError] = useState(null);
+    const messages = useMemo(() => COMMERCE_MESSAGES[normalizeCommerceLanguage(language)] || COMMERCE_MESSAGES.en, [language]);
+    const withMessages = (node) => (
+        <CommerceMessagesContext.Provider value={messages}>
+            {node}
+        </CommerceMessagesContext.Provider>
+    );
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -612,11 +1008,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 paymentCurrency: current.paymentCurrency || defaultCurrency,
             }));
         } catch (error) {
-            setLoadError(readError(error, 'Unable to load storefront.'));
+            setLoadError(readError(error, messages.unableToLoadStorefront));
         } finally {
             setLoading(false);
         }
-    }, [productLookup, productSlug, slug]);
+    }, [messages.unableToLoadStorefront, productLookup, productSlug, slug]);
 
     useEffect(() => {
         if (hasInitialState) return;
@@ -626,6 +1022,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     useEffect(() => {
         if (typeof navigator !== 'undefined') {
             setIsMobileBrowser(MOBILE_BROWSER_RE.test(navigator.userAgent || ''));
+            setLanguage(detectCommerceLanguage());
         }
     }, []);
 
@@ -671,8 +1068,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         .filter((item) => item.quantity > 0), [cart, products]);
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const cartTotal = cartSubtotal(cartItems);
-    const cartCurrency = cartItems[0]?.product?.priceCurrency || currencies.paymentCurrency || currencies.billingCurrency || '';
+    const cartTotalLabel = formatCartTotals(cartItems);
     const categories = useMemo(() => storeCategories(store, products), [store, products]);
     const appCheckoutLink = useMemo(() => commerceAppCheckoutDeepLink(cartItems, currencies), [cartItems, currencies]);
     const paymentMethods = discoveredPaymentMethods;
@@ -725,7 +1121,6 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
-        setCheckoutSheetOpen(false);
         setShowOrderPaymentView(false);
         setFlowError(null);
     };
@@ -740,7 +1135,6 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
-        setCheckoutSheetOpen(false);
         setShowOrderPaymentView(false);
         setFlowError(null);
     };
@@ -761,14 +1155,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }, [appCheckoutLink]);
 
     const validate = () => {
-        if (!cartItems.length) return 'Choose at least one product.';
+        if (!cartItems.length) return messages.chooseAtLeastOneProduct;
         const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
-        if (!cartCurrency && !currencies.billingCurrency.trim()) return 'Billing currency is required.';
-        if (!cartCurrency && !currencies.paymentCurrency.trim()) return 'Payment currency is required.';
+        if (!cartCurrency && !currencies.billingCurrency.trim()) return messages.billingCurrencyRequired;
+        if (!cartCurrency && !currencies.paymentCurrency.trim()) return messages.paymentCurrencyRequired;
         const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
-        if (!selectedMethod?.id) return `${selectedMethod?.name || 'This payment method'} is not configured for web checkout yet.`;
-        if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return 'Buyer phone is required for Mobile Money.';
-        if (selectedMethod.type === 'CRYPTO' && !selectedCryptoNetworkId) return 'Choose a crypto network.';
+        if (!selectedMethod?.id) return interpolate(messages.methodNotConfigured, { method: selectedMethod?.name || messages.paymentMethod });
+        if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return messages.buyerPhoneRequired;
+        if (selectedMethod.type === 'CRYPTO' && !selectedCryptoNetworkId) return messages.chooseCryptoNetwork;
         return null;
     };
 
@@ -810,14 +1204,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             setPaymentMethodsLoaded(true);
             return list;
         } catch (error) {
-            const normalizedError = readError(error, 'Unable to load payment methods.');
+            const normalizedError = readError(error, messages.unableToLoadPaymentMethods);
             setPaymentMethodsError(normalizedError);
             setPaymentMethodsLoaded(true);
             throw error;
         } finally {
             setPaymentMethodsLoading(false);
         }
-    }, [countryCode]);
+	    }, [countryCode, messages.unableToLoadPaymentMethods]);
 
     const fetchPaymentMethods = useCallback(async (currentOrder) => fetchPaymentMethodsForAmount({
         amount: currentOrder.paymentAmount ?? currentOrder.billingAmount ?? 0,
@@ -828,7 +1222,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         const methods = await fetchPaymentMethods(currentOrder);
         const selectedMethod = methods.find((method) => method.key === paymentMethod);
         if (!selectedMethod?.id) {
-            throw new Error('No payment method is available for this checkout.');
+            throw new Error(messages.noPaymentMethodAvailable);
         }
         return selectedMethod;
     };
@@ -867,7 +1261,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             setPaymentReviewContext(quoteResult);
             setPaymentReviewOpen(true);
         } catch (error) {
-            setFlowError(readError(error, 'Unable to check payment fees.'));
+            setFlowError(readError(error, messages.unableToCheckFees));
         } finally {
             setBusy(false);
         }
@@ -958,7 +1352,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             showPaymentPrompt(paidOrder, methodForPayment, paymentQuote);
             setOrder(paidOrder);
         } catch (error) {
-            setFlowError(readError(error, 'Unable to start payment.'));
+            setFlowError(readError(error, messages.unableToStartPayment));
         } finally {
             setBusy(false);
         }
@@ -999,7 +1393,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 if (cancelled) return;
                 setCryptoNetworks([]);
                 setSelectedCryptoNetworkId(null);
-                setCryptoNetworksError(readError(error, 'Unable to load crypto networks.'));
+                setCryptoNetworksError(readError(error, messages.unableToLoadCryptoNetworks));
             })
             .finally(() => {
                 if (!cancelled) setCryptoNetworksLoading(false);
@@ -1008,13 +1402,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         return () => {
             cancelled = true;
         };
-    }, [selectedPaymentMethod?.id, selectedPaymentMethod?.type]);
+    }, [messages.unableToLoadCryptoNetworks, selectedPaymentMethod?.id, selectedPaymentMethod?.type]);
 
     useEffect(() => {
         const fallbackProduct = cartItems[0]?.product || products.find((product) => product?.priceCurrency);
-        const discoveryAmount = cartItems.length ? cartSubtotal(cartItems) : number(fallbackProduct?.priceAmount);
-        const discoveryCurrency = cartItems[0]?.product?.priceCurrency ||
-            fallbackProduct?.priceCurrency ||
+        const discoveryAmount = number(fallbackProduct?.priceAmount);
+        const discoveryCurrency = fallbackProduct?.priceCurrency ||
             currencies.paymentCurrency ||
             currencies.billingCurrency ||
             '';
@@ -1091,21 +1484,21 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }, [buyer?.name, cartItems, order?.paymentAmount, order?.paymentCurrency, order?.paymentTransactionStatus, order?.reference, order?.status, order?.totalAmount, order?.totalCurrency, selectedPaymentMethod?.name, store?.name]);
 
     if (loading) {
-        return <Screen><StateCard title="Loading storefront..." /></Screen>;
+        return withMessages(<Screen><StateCard title={messages.loadingStorefront} /></Screen>);
     }
 
     if (loadError) {
         const title = isFeatureDisabled(loadError)
-            ? 'Commerce unavailable'
+            ? messages.commerceUnavailable
             : isNotFound(loadError)
-                ? 'Store not found'
-                : 'Unable to load storefront';
+                ? messages.storeNotFound
+                : messages.unableToLoadStorefront;
 
-        return (
+        return withMessages(
             <Screen>
                 <StateCard title={title} message={loadError.message}>
                     {!isFeatureDisabled(loadError) && (
-                        <button className="button secondary" onClick={load}>Retry</button>
+                        <button className="button secondary" onClick={load}>{messages.retry}</button>
                     )}
                 </StateCard>
             </Screen>
@@ -1136,6 +1529,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 setPaymentReviewContext(null);
                 setPaymentPrompt(null);
                 setCheckout(null);
+                setPaymentMethod('');
                 setDiscoveredPaymentMethods([]);
                 setPaymentMethodsError(null);
                 setPaymentMethodsLoaded(false);
@@ -1188,20 +1582,20 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     ) : null;
 
     if (order && showOrderPaymentView) {
-        return (
+        return withMessages(
             <Screen>
                 <section className="order-panel">
                     <div className="status-pill">{order.status || 'PENDING_PAYMENT'}</div>
-                    <h1>Complete payment</h1>
-                    <p>Fees are checked before payment starts.</p>
+                    <h1>{messages.completePayment}</h1>
+                    <p>{messages.feesChecked}</p>
 
                     <dl className="order-details">
                         <div>
-                            <dt>Order reference</dt>
+                            <dt>{messages.orderReference}</dt>
                             <dd>{order.reference}</dd>
                         </div>
                         <div>
-                            <dt>Total amount</dt>
+                            <dt>{messages.totalAmount}</dt>
                             <dd>{amount(order.totalAmount, order.totalCurrency)}</dd>
                         </div>
                     </dl>
@@ -1254,7 +1648,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                             setFlowError(null);
                         }}
                     >
-                        Back to store
+                        {messages.backToStore}
                     </button>
                 </section>
             </Screen>
@@ -1263,7 +1657,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
     const directProduct = (productLookup || productSlug) ? products[0] : null;
     if (directProduct) {
-        return (
+        return withMessages(
             <Screen wide>
                 <ProductDetailPage
                     product={directProduct}
@@ -1277,7 +1671,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 />
                 <CheckoutSheet
                     open={checkoutSheetOpen}
-                    title="Checkout"
+                    title={messages.checkout}
                     onClose={() => setCheckoutSheetOpen(false)}
                 >
                     <CheckoutPaymentForm
@@ -1331,6 +1725,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }
 
     return (
+        withMessages(
         <Screen wide>
             <StoreProfilePage
                 store={store}
@@ -1340,8 +1735,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 activeTab={activeTab}
                 cart={cart}
                 cartCount={cartCount}
-                cartTotal={cartTotal}
-                cartCurrency={cartCurrency}
+                cartTotal={cartTotalLabel}
                 onTabChange={setActiveTab}
                 onProductOpen={(product) => {
                     const targetSlug = product.slug || product.id;
@@ -1354,7 +1748,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             />
             <CheckoutSheet
                 open={checkoutSheetOpen}
-                title="Checkout"
+                title={messages.checkout}
                 onClose={() => setCheckoutSheetOpen(false)}
             >
                     <CheckoutPaymentForm
@@ -1415,10 +1809,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             {paymentPromptModal}
             {receiptModal}
         </Screen>
+        )
     );
 }
 
 function ProductHero({ product, store, onOpenGallery }) {
+    const messages = useCommerceMessages();
     const images = productImages(product);
     const image = images[0];
     return (
@@ -1435,7 +1831,7 @@ function ProductHero({ product, store, onOpenGallery }) {
                 ) : (
                     <div className="product-page-media-fallback">{initials(product.name)}</div>
                 )}
-                {images.length > 1 && <span className="product-image-count product-image-count--hero">{images.length} photos</span>}
+                {images.length > 1 && <span className="product-image-count product-image-count--hero">{images.length} {messages.photos}</span>}
             </button>
 
             <div className="product-page-copy">
@@ -1446,17 +1842,17 @@ function ProductHero({ product, store, onOpenGallery }) {
                         <span>{initials(store?.name || product?.storeName)}</span>
                     )}
                     <div>
-                        <strong>{store?.name || product?.storeName || 'Fondeka merchant'}</strong>
+                        <strong>{store?.name || product?.storeName || messages.merchant}</strong>
                         {store?.description && <small>{store.description}</small>}
                     </div>
                 </div>
 
-                <p className="eyebrow">{product.type || 'Product'}</p>
+                <p className="eyebrow">{product.type || messages.product}</p>
                 <h1>{product.name}</h1>
                 <div className="product-page-price">{amount(product.priceAmount, product.priceCurrency)}</div>
                 {product.description && <p className="product-page-description">{product.description}</p>}
                 <div className="store-meta">
-                    <span>{inventoryLabel(product)}</span>
+                    <span>{inventoryLabel(product, messages)}</span>
                     {store?.countryCode && <span>{store.countryCode}</span>}
                 </div>
                 <StoreContactActions store={store} compact />
@@ -1496,6 +1892,8 @@ function StateCard({ title, message, children }) {
 }
 
 function ShareButton({ label = 'Share', text }) {
+    const messages = useCommerceMessages();
+    const resolvedLabel = label === 'Share' ? messages.share : label;
     const handleShare = async () => {
         const shareUrl = text || (typeof window !== 'undefined' ? window.location.href : '');
         try {
@@ -1510,27 +1908,30 @@ function ShareButton({ label = 'Share', text }) {
     };
 
     return (
-        <button type="button" className="profile-icon-button" onClick={handleShare} aria-label={label}>
+        <button type="button" className="profile-icon-button" onClick={handleShare} aria-label={resolvedLabel}>
             ↗
         </button>
     );
 }
 
 function ProfileTopBar({ title = 'Fondeka Commerce', backHref = '/' }) {
+    const messages = useCommerceMessages();
+    const resolvedTitle = title === 'Fondeka Commerce' ? messages.fondekaCommerce : title === 'Product' ? messages.product : title;
     return (
         <div className="profile-topbar">
-            <a className="profile-back-button" href={backHref} aria-label="Back">
+            <a className="profile-back-button" href={backHref} aria-label={messages.back}>
                 ‹
             </a>
-            <strong>{title}</strong>
+            <strong>{resolvedTitle}</strong>
             <ShareButton />
         </div>
     );
 }
 
 function VerifiedBadge({ className = '' }) {
+    const messages = useCommerceMessages();
     return (
-        <span className={`verified-badge${className ? ` ${className}` : ''}`} aria-label="Verified by Fondeka" title="Verified by Fondeka">
+        <span className={`verified-badge${className ? ` ${className}` : ''}`} aria-label={messages.verifiedByFondeka} title={messages.verifiedByFondeka}>
             <svg width="15" height="15" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                 <path d="M10 2.4l5.8 2.2v4.1c0 3.8-2.4 7.2-5.8 8.8-3.4-1.6-5.8-5-5.8-8.8V4.6L10 2.4z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
                 <path d="M6.9 10.1l2 2 4.2-4.4" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
@@ -1548,13 +1949,13 @@ function StoreProfilePage({
     cart,
     cartCount,
     cartTotal,
-    cartCurrency,
     onTabChange,
     onProductOpen,
     onProductAdd,
     onProductRemove,
     onPay,
 }) {
+    const messages = useCommerceMessages();
     const tabs = {
         PRODUCTS: (
             products.length ? (
@@ -1571,7 +1972,7 @@ function StoreProfilePage({
                     ))}
                 </div>
             ) : (
-                <StateCard title="No products yet" message="This store has no products available right now." />
+                <StateCard title={messages.noProductsTitle} message={messages.noProductsBody} />
             )
         ),
         ABOUT: <AboutPanel store={store} categories={categories} />,
@@ -1583,13 +1984,13 @@ function StoreProfilePage({
             <ProfileTopBar title="Fondeka Commerce" />
             <StoreProfileHeader store={store} />
             <StoreTabs activeTab={activeTab} onChange={onTabChange} />
-            <section className="store-tab-panel" aria-label={STORE_TAB_LABELS[activeTab]}>
+            <section className="store-tab-panel" aria-label={messages.storeTabs[activeTab]}>
                 {tabs[activeTab]}
             </section>
             {cartCount > 0 && (
                 <StickyCheckoutBar
                     count={cartCount}
-                    total={amount(cartTotal, cartCurrency)}
+                    total={cartTotal}
                     onPay={onPay}
                 />
             )}
@@ -1598,9 +1999,10 @@ function StoreProfilePage({
 }
 
 function StoreProfileHeader({ store }) {
+    const messages = useCommerceMessages();
     const verified = isVerifiedStatus(store?.verificationStatus);
     const memberSince = formatMemberSince(store?.createdAt);
-    const capabilities = storeCapabilities(store);
+    const capabilities = storeCapabilities(store, messages);
 
     return (
         <section className="store-profile-header">
@@ -1613,12 +2015,12 @@ function StoreProfileHeader({ store }) {
 
             <div className="store-profile-identity">
                 <div className="store-name-line">
-                    <h1>{store?.name || store?.slug || 'Store'}</h1>
+                    <h1>{store?.name || store?.slug || messages.store}</h1>
                     {verified ? <VerifiedBadge /> : null}
                 </div>
                 {(memberSince || store?.countryCode) && (
                     <div className="store-profile-meta">
-                        {memberSince && <span>Membre depuis {memberSince}</span>}
+                        {memberSince && <span>{interpolate(messages.memberSince, { date: memberSince })}</span>}
                         {store?.countryCode && <span className="store-location"><LocationIcon />{store.countryCode}</span>}
                     </div>
                 )}
@@ -1636,9 +2038,10 @@ function StoreProfileHeader({ store }) {
 }
 
 function StoreTabs({ activeTab, onChange }) {
+    const messages = useCommerceMessages();
     const activeIndex = Math.max(0, STORE_TABS.indexOf(activeTab));
     return (
-        <div className="store-tabs" role="tablist" aria-label="Store profile">
+        <div className="store-tabs" role="tablist" aria-label={messages.storeProfile}>
             <span className="store-tab-indicator" style={{ transform: `translateX(${activeIndex * 100}%)` }} />
             {STORE_TABS.map((tab) => (
                 <button
@@ -1649,7 +2052,7 @@ function StoreTabs({ activeTab, onChange }) {
                     className={activeTab === tab ? 'store-tab store-tab--active' : 'store-tab'}
                     onClick={() => onChange(tab)}
                 >
-                    {STORE_TAB_LABELS[tab]}
+                    {messages.storeTabs[tab]}
                 </button>
             ))}
         </div>
@@ -1657,15 +2060,16 @@ function StoreTabs({ activeTab, onChange }) {
 }
 
 function AboutPanel({ store, categories }) {
+    const messages = useCommerceMessages();
     const memberSince = formatMemberSince(store?.createdAt, true);
     return (
         <section className="store-info-panel">
-            <h2>À propos</h2>
+            <h2>{messages.about}</h2>
             {store?.description && <p>{store.description}</p>}
-            {!!categories.length && <InfoLine label="Categories" value={categories.join(', ')} />}
-            {store?.countryCode && <InfoLine label="Pays" value={store.countryCode} />}
-            {memberSince && <InfoLine label="Membre depuis" value={memberSince} />}
-            {isVerifiedStatus(store?.verificationStatus) && <InfoLine label="Confiance" value="Vérifiée par Fondeka" />}
+            {!!categories.length && <InfoLine label={messages.categories} value={categories.join(', ')} />}
+            {store?.countryCode && <InfoLine label={messages.country} value={store.countryCode} />}
+            {memberSince && <InfoLine label={messages.memberSince.replace(' {date}', '').replace('{date}', '').trim()} value={memberSince} />}
+            {isVerifiedStatus(store?.verificationStatus) && <InfoLine label={messages.trust} value={messages.verifiedByFondeka} />}
         </section>
     );
 }
@@ -1680,6 +2084,7 @@ function InfoLine({ label, value }) {
 }
 
 function StoreContactActions({ store, compact = false }) {
+    const messages = useCommerceMessages();
     const contactLinks = storeContactLinks(store);
     const socialLinks = storeSocialLinks(store);
 
@@ -1688,7 +2093,7 @@ function StoreContactActions({ store, compact = false }) {
     return (
         <div className={`store-contact-actions${compact ? ' store-contact-actions--compact' : ''}`}>
             {!!contactLinks.length && (
-                <div className="store-contact-primary" aria-label="Store contact actions">
+                <div className="store-contact-primary" aria-label={messages.storeContactActions}>
                     {contactLinks.map((link) => (
                         <a key={link.key} href={link.href} target={link.key === 'whatsapp' ? '_blank' : undefined} rel={link.key === 'whatsapp' ? 'noreferrer' : undefined}>
                             {link.key === 'whatsapp' ? <WhatsAppIcon /> : <MailIcon />}
@@ -1698,7 +2103,7 @@ function StoreContactActions({ store, compact = false }) {
                 </div>
             )}
             {!!socialLinks.length && (
-                <div className="store-social-links" aria-label="Store social links">
+                <div className="store-social-links" aria-label={messages.storeSocialLinks}>
                     {socialLinks.map((link) => (
                         <a key={link.key} href={link.href} target="_blank" rel="noreferrer" aria-label={link.label}>
                             {link.icon}
@@ -1711,9 +2116,10 @@ function StoreContactActions({ store, compact = false }) {
 }
 
 function StarRating({ stars, label }) {
+    const messages = useCommerceMessages();
     const safeStars = Math.max(0, Math.min(5, Math.round(number(stars))));
     return (
-        <div className="star-rating" aria-label={label || `${safeStars} out of 5 stars`}>
+        <div className="star-rating" aria-label={label || interpolate(messages.starRating, { rating: safeStars })}>
             {Array.from({ length: 5 }).map((_, index) => (
                 <span key={index} className={index < safeStars ? 'star-rating-star--filled' : ''}>★</span>
             ))}
@@ -1722,24 +2128,26 @@ function StarRating({ stars, label }) {
 }
 
 function StoreReviews({ reviews, storeName }) {
+    const messages = useCommerceMessages();
     if (!reviews?.length) {
         return (
             <section className="store-info-panel">
-                <h2>Reviews</h2>
-                <p>Reviews will appear here when customers start rating this store.</p>
+                <h2>{messages.reviews}</h2>
+                <p>{messages.reviewsEmpty}</p>
             </section>
         );
     }
 
     const average = reviews.reduce((sum, review) => sum + review.stars, 0) / reviews.length;
-    const averageLabel = `${average.toFixed(1)} out of 5`;
+    const averageLabel = interpolate(messages.starRating, { rating: average.toFixed(1) });
+    const reviewLabel = reviews.length === 1 ? messages.reviewSingular : messages.reviewPlural;
 
     return (
-        <section className="store-reviews store-reviews--tab" aria-label="Store reviews">
+        <section className="store-reviews store-reviews--tab" aria-label={messages.reviews}>
             <div className="store-reviews-heading">
                 <div>
-                    <h2>Reviews</h2>
-                    <p>{averageLabel} from {reviews.length} review{reviews.length === 1 ? '' : 's'}</p>
+                    <h2>{messages.reviews}</h2>
+                    <p>{interpolate(messages.reviewsSummary, { rating: average.toFixed(1), count: reviews.length, reviewLabel })}</p>
                 </div>
                 <StarRating stars={average} label={averageLabel} />
             </div>
@@ -1747,9 +2155,9 @@ function StoreReviews({ reviews, storeName }) {
                 {reviews.map((review, index) => (
                     <article className="store-review-card" key={review.id || index}>
                         <div className="review-head">
-                            <span className="review-avatar">{initials(review.reviewerName || 'Customer').slice(0, 1)}</span>
+                            <span className="review-avatar">{initials(review.reviewerName || messages.customer).slice(0, 1)}</span>
                             <div>
-                                <strong>{review.reviewerName || 'Customer'}</strong>
+                                <strong>{review.reviewerName || messages.customer}</strong>
                                 <div className="review-meta">
                                     <StarRating stars={review.stars} />
                                     {review.createdAt && <span>{formatReviewDate(review.createdAt)}</span>}
@@ -1759,7 +2167,7 @@ function StoreReviews({ reviews, storeName }) {
                         <p>{review.message}</p>
                         {review.replyMessage && (
                             <div className="review-reply">
-                                <strong>Réponse de {review.replyByName || storeName || 'la boutique'}</strong>
+                                <strong>{interpolate(messages.replyFrom, { name: review.replyByName || storeName || messages.store })}</strong>
                                 <p>{review.replyMessage}</p>
                                 {review.repliedAt && <span>{formatReviewDate(review.repliedAt)}</span>}
                             </div>
@@ -1772,7 +2180,8 @@ function StoreReviews({ reviews, storeName }) {
 }
 
 function ProfileProductCard({ product, quantity, onOpen, onAdd, onRemove }) {
-    const out = inventoryLabel(product) === 'Out of stock';
+    const messages = useCommerceMessages();
+    const out = inventoryLabel(product, messages) === messages.outOfStock;
     const images = productImages(product);
     const image = images[0];
     return (
@@ -1781,22 +2190,22 @@ function ProfileProductCard({ product, quantity, onOpen, onAdd, onRemove }) {
                 type="button"
                 className="profile-product-media"
                 onClick={onOpen}
-                aria-label={`View ${product.name}`}
+                aria-label={interpolate(messages.viewProduct, { name: product.name || product.slug || messages.product })}
             >
                 {image ? <img src={image} alt="" /> : initials(product.name)}
             </button>
             <div className="profile-product-body">
-                <button type="button" className="profile-product-name" onClick={onOpen}>{product.name || product.slug || 'Product'}</button>
+                <button type="button" className="profile-product-name" onClick={onOpen}>{product.name || product.slug || messages.product}</button>
                 <strong className="profile-product-price">{amount(product.priceAmount, product.priceCurrency)}</strong>
                 <div className="profile-product-actions">
                     {quantity > 0 && (
                         <>
-                            <button type="button" className="profile-qty-button" onClick={onRemove} disabled={out} aria-label="Decrease quantity">−</button>
+                            <button type="button" className="profile-qty-button" onClick={onRemove} disabled={out} aria-label={messages.decreaseQuantity}>−</button>
                             <span>{quantity}</span>
                         </>
                     )}
                     <button type="button" className={quantity > 0 ? 'profile-add-button profile-add-button--icon' : 'profile-add-button'} onClick={onAdd} disabled={out}>
-                        {quantity > 0 ? '+' : 'Add'}
+                        {quantity > 0 ? '+' : messages.add}
                     </button>
                 </div>
             </div>
@@ -1805,23 +2214,26 @@ function ProfileProductCard({ product, quantity, onOpen, onAdd, onRemove }) {
 }
 
 function Quantity({ quantity, onIncrement, onDecrement, disabled }) {
+    const messages = useCommerceMessages();
     return (
         <div className="quantity">
-            <button onClick={onDecrement} disabled={disabled || quantity <= 0} aria-label="Decrease quantity">-</button>
+            <button onClick={onDecrement} disabled={disabled || quantity <= 0} aria-label={messages.decreaseQuantity}>-</button>
             <span>{quantity}</span>
-            <button onClick={onIncrement} disabled={disabled} aria-label="Increase quantity">+</button>
+            <button onClick={onIncrement} disabled={disabled} aria-label={messages.increaseQuantity}>+</button>
         </div>
     );
 }
 
 function StickyCheckoutBar({ count, total, onPay }) {
+    const messages = useCommerceMessages();
+    const itemLabel = count === 1 ? messages.itemSingular : messages.itemPlural;
     return (
-        <div className="sticky-checkout-bar" role="region" aria-label="Checkout">
+        <div className="sticky-checkout-bar" role="region" aria-label={messages.checkout}>
             <div>
-                <strong>{count} article{count === 1 ? '' : 's'}</strong>
+                <strong>{count} {itemLabel}</strong>
                 {total && <span>{total}</span>}
             </div>
-            <button type="button" onClick={onPay}>Payer</button>
+            <button type="button" onClick={onPay}>{messages.pay}</button>
         </div>
     );
 }
@@ -1836,16 +2248,17 @@ function ProductDetailPage({
     onQuantityChange,
     onPay,
 }) {
+    const messages = useCommerceMessages();
     const images = productImages(product);
     const activeImage = images[activeImageIndex] || images[0] || '';
     const verified = isVerifiedStatus(product?.storeVerificationStatus || store?.verificationStatus);
-    const storeName = product?.storeName || store?.name || 'Store';
+    const storeName = product?.storeName || store?.name || messages.store;
     const whatsappHref = whatsappLink(store?.whatsappNumber || product?.storeWhatsappNumber || product?.whatsappNumber);
     const storeHref = store?.slug ? `/stores/${encodeURIComponent(store.slug)}` : '#';
 
     return (
         <div className="product-detail-page">
-            <ProfileTopBar title="Product" backHref={storeHref !== '#' ? storeHref : '/'} />
+            <ProfileTopBar title={messages.product} backHref={storeHref !== '#' ? storeHref : '/'} />
             <div className="product-detail-layout">
                 <section className="product-detail-media-col">
                     <div
@@ -1856,7 +2269,7 @@ function ProductDetailPage({
                             className="product-detail-media-zoom"
                             onClick={() => activeImage && onOpenGallery(activeImageIndex || 0)}
                             disabled={!activeImage}
-                            aria-label={activeImage ? `Zoom ${product.name}` : product.name}
+                            aria-label={activeImage ? interpolate(messages.zoomProduct, { name: product.name }) : product.name}
                         >
                             {activeImage ? <img src={activeImage} alt={product.name || ''} /> : <span>{initials(product.name)}</span>}
                         </button>
@@ -1870,14 +2283,14 @@ function ProductDetailPage({
                         {verified && <VerifiedBadge className="verified-badge--media" />}
                     </div>
                     {images.length > 1 && (
-                        <div className="product-gallery-thumbs" aria-label="Product images">
+                        <div className="product-gallery-thumbs" aria-label={messages.productImages}>
                             {images.map((image, index) => (
                                 <button
                                     key={image}
                                     type="button"
                                     className={image === activeImage ? 'product-thumb product-thumb--active' : 'product-thumb'}
                                     onClick={() => onImageChange(index)}
-                                    aria-label={`Show image ${index + 1}`}
+                                    aria-label={interpolate(messages.showImage, { number: index + 1 })}
                                 >
                                     <img src={image} alt="" />
                                 </button>
@@ -1888,7 +2301,7 @@ function ProductDetailPage({
 
                 <section className="product-detail-copy">
                     <div className="product-name-row">
-                        <h1>{product.name || product.slug || 'Product'}</h1>
+                        <h1>{product.name || product.slug || messages.product}</h1>
                         {whatsappHref && (
                             <a className="product-whatsapp-button" href={whatsappHref} target="_blank" rel="noreferrer" aria-label="WhatsApp">
                                 <WhatsAppIcon />
@@ -1901,7 +2314,7 @@ function ProductDetailPage({
                     </div>
                     {product.description && (
                         <div className="product-description-section">
-                            <h2>Description</h2>
+                            <h2>{messages.description}</h2>
                             <p>{product.description}</p>
                         </div>
                     )}
@@ -1909,17 +2322,18 @@ function ProductDetailPage({
             </div>
             <div className="product-sticky-buy-row">
                 <div className="product-buy-qty">
-                    <button type="button" onClick={() => onQuantityChange(quantity - 1)} disabled={quantity <= 1} aria-label="Decrease quantity">−</button>
+                    <button type="button" onClick={() => onQuantityChange(quantity - 1)} disabled={quantity <= 1} aria-label={messages.decreaseQuantity}>−</button>
                     <span>{quantity}</span>
-                    <button type="button" onClick={() => onQuantityChange(quantity + 1)} aria-label="Increase quantity">+</button>
+                    <button type="button" onClick={() => onQuantityChange(quantity + 1)} aria-label={messages.increaseQuantity}>+</button>
                 </div>
-                <button type="button" className="product-pay-button" onClick={onPay}>Payer</button>
+                <button type="button" className="product-pay-button" onClick={onPay}>{messages.pay}</button>
             </div>
         </div>
     );
 }
 
 function CheckoutSheet({ open, title, onClose, children }) {
+    const messages = useCommerceMessages();
     if (!open) return null;
     return (
         <div className="checkout-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
@@ -1927,7 +2341,7 @@ function CheckoutSheet({ open, title, onClose, children }) {
                 <div className="checkout-sheet-handle" aria-hidden="true" />
                 <div className="checkout-sheet-header">
                     <h2>{title}</h2>
-                    <button type="button" onClick={onClose}>Close</button>
+                    <button type="button" onClick={onClose}>{messages.close}</button>
                 </div>
                 {children}
             </div>
@@ -1980,21 +2394,22 @@ function MailIcon({ className = 'mail-icon' }) {
 }
 
 function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker }) {
+    const messages = useCommerceMessages();
     const update = (key, value) => setBuyer((current) => ({ ...current, [key]: value }));
     const localPhone = nationalPhoneNumber(buyer.phone, selectedCountry);
 
     return (
         <div className="buyer-fields">
             <label>
-                <span>Name</span>
-                <input value={buyer.name} onChange={(event) => update('name', event.target.value)} placeholder="Buyer name" />
+                <span>{messages.name}</span>
+                <input value={buyer.name} onChange={(event) => update('name', event.target.value)} placeholder={messages.buyerName} />
             </label>
             <label>
-                <span>Email</span>
+                <span>{messages.email}</span>
                 <input value={buyer.email} onChange={(event) => update('email', event.target.value)} placeholder="buyer@example.com" inputMode="email" />
             </label>
             <label>
-                <span>Phone</span>
+                <span>{messages.phone}</span>
                 <div className="phone-input-row">
                     <button type="button" className="phone-code-button" onClick={onOpenCountryPicker}>
                         <span aria-hidden="true">{selectedCountry?.flag}</span>
@@ -2014,18 +2429,19 @@ function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker }) 
 }
 
 function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, onOpenCountryPicker }) {
+    const messages = useCommerceMessages();
     const hasDetails = hasBuyerDetails(buyer);
 
     if (!open && hasDetails) {
         return (
             <div className="buyer-summary">
                 <div className="buyer-summary-main">
-                    <strong>{buyer.name || 'Buyer'}</strong>
-                    <span>{buyer.phone || 'No phone saved'}</span>
+                    <strong>{buyer.name || messages.buyer}</strong>
+                    <span>{buyer.phone || messages.noPhoneSaved}</span>
                     {buyer.email && <span>{buyer.email}</span>}
                 </div>
                 <button type="button" className="buyer-summary-edit" onClick={() => setOpen(true)}>
-                    Edit
+                    {messages.edit}
                 </button>
             </div>
         );
@@ -2041,7 +2457,7 @@ function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, 
             />
             {hasDetails && (
                 <button type="button" className="buyer-collapse-button" onClick={() => setOpen(false)}>
-                    Use these details
+                    {messages.useTheseDetails}
                 </button>
             )}
         </div>
@@ -2078,20 +2494,18 @@ function CheckoutPaymentForm({
     onOpenAppCheckout,
     onConfirm,
 }) {
+    const messages = useCommerceMessages();
     const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
-    const cartSubtotal = cartItems.reduce((sum, { product, quantity }) => (
-        sum + number(product.priceAmount) * number(quantity)
-    ), 0);
-    const cartCurrency = cartItems[0]?.product?.priceCurrency || currencies.billingCurrency || '';
+    const cartSubtotalLabel = formatCartTotals(cartItems);
 
     return (
-        <section className="commerce-payment-flow" aria-label="Payment">
+        <section className="commerce-payment-flow" aria-label={messages.payment}>
             <section className="payment-step-card">
                 <div className="payment-step-heading payment-step-heading--primary">
                     <span>1</span>
                     <div>
-                        <strong>Order total</strong>
-                        <small>{cartItems.length ? `${cartItems.length} line item${cartItems.length === 1 ? '' : 's'}` : 'No items selected'}</small>
+                        <strong>{messages.orderTotal}</strong>
+                        <small>{cartItems.length ? `${cartItems.length} ${cartItems.length === 1 ? messages.lineItemSingular : messages.lineItemPlural}` : messages.noItemsSelected}</small>
                     </div>
                 </div>
 
@@ -2108,14 +2522,14 @@ function CheckoutPaymentForm({
                         ))}
                     </div>
                 ) : (
-                    <p className="muted">Choose products to start a checkout.</p>
+	                    <p className="muted">{messages.chooseProducts}</p>
                 )}
 
                 {cartItems.length > 0 && (
                     <div className="commerce-payment-total">
-                        <span>Estimated subtotal</span>
-                        <strong>{amount(cartSubtotal, cartCurrency)}</strong>
-                    </div>
+	                        <span>{messages.estimatedSubtotal}</span>
+	                        <strong>{cartSubtotalLabel}</strong>
+	                    </div>
                 )}
             </section>
 
@@ -2123,8 +2537,8 @@ function CheckoutPaymentForm({
                 <div className="payment-step-heading">
                     <span>2</span>
                     <div>
-                        <strong>Buyer details</strong>
-                        <small>Used for confirmation and payment follow-up</small>
+	                        <strong>{messages.buyerDetails}</strong>
+	                        <small>{messages.buyerDetailsHelp}</small>
                     </div>
                 </div>
                 <BuyerDetailsSection
@@ -2141,19 +2555,10 @@ function CheckoutPaymentForm({
                 <div className="payment-step-heading">
                     <span>3</span>
                     <div>
-                        <strong>How to pay</strong>
-                        <small>Fees are checked before payment starts</small>
+	                        <strong>{messages.howToPay}</strong>
+	                        <small>{messages.feesChecked}</small>
                     </div>
                 </div>
-
-                {showAppCheckout && (
-                    <FondekaAppPaymentPanel
-                        appCheckoutLink={appCheckoutLink}
-                        disabled={!cartItems.length}
-                        showInstallFallback={showAppInstallFallback}
-                        onOpen={onOpenAppCheckout}
-                    />
-                )}
 
                 <PaymentMethodPicker
                     paymentMethod={paymentMethod}
@@ -2171,13 +2576,21 @@ function CheckoutPaymentForm({
                     setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                     selectedCountry={selectedCountry}
                     onOpenCountryPicker={onOpenCountryPicker}
+	                    actionLabel={messages.startPayment}
+	                    actionLoadingLabel={messages.startingPayment}
+                    actionDisabled={busy || !cartItems.length}
+                    actionBusy={busy}
+                    onAction={onConfirm}
                 />
 
-                <div className="actions payment-actions">
-                    <button type="button" className="button primary" onClick={onConfirm} disabled={busy || !cartItems.length}>
-                        {busy ? <LoadingButtonLabel label="Starting payment" /> : 'Start payment'}
-                    </button>
-                </div>
+                {showAppCheckout && (
+                    <FondekaAppPaymentPanel
+                        appCheckoutLink={appCheckoutLink}
+                        disabled={!cartItems.length}
+                        showInstallFallback={showAppInstallFallback}
+                        onOpen={onOpenAppCheckout}
+                    />
+                )}
 
                 {flowError && (
                     isFeatureDisabled(flowError)
@@ -2217,22 +2630,23 @@ function OrderPaymentPanel({
     onOpenAppCheckout,
     onConfirm,
 }) {
+    const messages = useCommerceMessages();
     const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
     const status = String(order?.status || '').toUpperCase();
     const payable = !status || status === 'PENDING_PAYMENT';
 
     return (
-        <section className="commerce-payment-flow" aria-label="Order payment">
+        <section className="commerce-payment-flow" aria-label={messages.orderPayment}>
             <section className="payment-step-card">
                 <div className="payment-step-heading payment-step-heading--primary">
                     <span>1</span>
                     <div>
-                        <strong>Checkout amount</strong>
-                        <small>Amount before Fondeka payment fees</small>
+                        <strong>{messages.checkoutAmount}</strong>
+                        <small>{messages.amountBeforeFees}</small>
                     </div>
                 </div>
                 <div className="commerce-payment-total commerce-payment-total--plain">
-                    <span>Amount to fund</span>
+                    <span>{messages.amountToFund}</span>
                     <strong>{amount(order.paymentAmount, order.paymentCurrency)}</strong>
                 </div>
             </section>
@@ -2241,18 +2655,10 @@ function OrderPaymentPanel({
                 <div className="payment-step-heading">
                     <span>2</span>
                     <div>
-                        <strong>Payment method</strong>
-                        <small>Fees are checked before payment starts</small>
+                        <strong>{messages.paymentMethod}</strong>
+                        <small>{messages.feesChecked}</small>
                     </div>
                 </div>
-                {showAppCheckout && (
-                    <FondekaAppPaymentPanel
-                        appCheckoutLink={appCheckoutLink}
-                        disabled={!payable}
-                        showInstallFallback={showAppInstallFallback}
-                        onOpen={onOpenAppCheckout}
-                    />
-                )}
                 <PaymentMethodPicker
                     paymentMethod={paymentMethod}
                     setPaymentMethod={setPaymentMethod}
@@ -2270,13 +2676,21 @@ function OrderPaymentPanel({
                     selectedCountry={selectedCountry}
                     onOpenCountryPicker={onOpenCountryPicker}
                     disabled={!payable}
+	                    actionLabel={messages.startPayment}
+	                    actionLoadingLabel={messages.startingPayment}
+                    actionDisabled={busy || !payable}
+                    actionBusy={busy}
+                    onAction={onConfirm}
                 />
 
-                <div className="actions payment-actions">
-                    <button type="button" className="button primary" onClick={onConfirm} disabled={busy || !payable}>
-                        {busy ? <LoadingButtonLabel label="Starting payment" /> : 'Start payment'}
-                    </button>
-                </div>
+                {showAppCheckout && (
+                    <FondekaAppPaymentPanel
+                        appCheckoutLink={appCheckoutLink}
+                        disabled={!payable}
+                        showInstallFallback={showAppInstallFallback}
+                        onOpen={onOpenAppCheckout}
+                    />
+                )}
 
                 {flowError && (
                     isFeatureDisabled(flowError)
@@ -2290,24 +2704,28 @@ function OrderPaymentPanel({
 }
 
 function FondekaAppPaymentPanel({ appCheckoutLink, disabled, showInstallFallback, onOpen }) {
+    const messages = useCommerceMessages();
     return (
         <div className="fondeka-app-pay-panel">
-            <div className="fondeka-app-pay-copy">
-                <strong>Fondeka app</strong>
-                <span>Open this checkout in the app and pay with your Fondeka balance or saved rails.</span>
+            <div className="fondeka-app-pay-separator"><span>{messages.or}</span></div>
+            <div className="fondeka-app-pay-row">
+                <div className="fondeka-app-pay-copy">
+                    <strong>{messages.payWithFondekaApp}</strong>
+                    <span>{messages.fondekaAppHelp}</span>
+                </div>
+                <button
+                    type="button"
+                    className="fondeka-app-pay-button"
+                    onClick={onOpen}
+                    disabled={disabled || !appCheckoutLink}
+                >
+                    {messages.openApp}
+                </button>
             </div>
-            <button
-                type="button"
-                className="button primary fondeka-app-pay-button"
-                onClick={onOpen}
-                disabled={disabled || !appCheckoutLink}
-            >
-                Pay with Fondeka
-            </button>
             {showInstallFallback && (
                 <div className="fondeka-app-pay-fallback">
-                    <p>Fondeka app not installed? Download the app to finish this checkout on mobile.</p>
-                    <a href="/#download">Download the app</a>
+                    <p>{messages.appInstallFallback}</p>
+                    <a href="/#download">{messages.downloadApp}</a>
                 </div>
             )}
         </div>
@@ -2331,7 +2749,13 @@ function PaymentMethodPicker({
     selectedCountry,
     onOpenCountryPicker,
     disabled = false,
+    actionLabel,
+    actionLoadingLabel,
+    actionDisabled = false,
+    actionBusy = false,
+    onAction,
 }) {
+    const messages = useCommerceMessages();
     const grouped = groupedPaymentMethods(methods);
     const groupKeys = Object.keys(grouped);
     const firstAvailableGroup = groupKeys[0] || '';
@@ -2366,7 +2790,7 @@ function PaymentMethodPicker({
     return (
         <div className="payment-method-focus">
             <div className="payment-methods-heading">
-                <span>Pay with</span>
+                <span>{messages.payWith}</span>
                 <button
                     type="button"
                     className="payment-country-chip"
@@ -2374,12 +2798,12 @@ function PaymentMethodPicker({
                     disabled={disabled}
                 >
                     <span aria-hidden="true">{selectedCountry?.flag}</span>
-                    <strong>{selectedCountry?.name || selectedCountry?.code || 'Country'}</strong>
+	                    <strong>{selectedCountry?.name || selectedCountry?.code || messages.countryFallback}</strong>
                     <ChevronDownIcon />
                 </button>
             </div>
 
-            {loading && <div className="payment-method-status">Loading payment methods...</div>}
+            {loading && <div className="payment-method-status">{messages.loadingPaymentMethods}</div>}
             {error && <div className="payment-method-status payment-method-status--error">{error.message}</div>}
 
             {groupKeys.length ? (
@@ -2393,13 +2817,13 @@ function PaymentMethodPicker({
                                 aria-expanded={!!expanded[type]}
                                 disabled={disabled}
                             >
-                                <span>{PAYMENT_TYPE_LABELS[type] || type}</span>
+	                                <span>{messages.paymentTypeLabels[type] || type}</span>
                                 <span className="payment-method-accordion-icon" aria-hidden="true">
                                     <ChevronDownIcon className="payment-method-chevron" />
                                 </span>
                             </button>
                             {expanded[type] && (
-                                <>
+                                <div className="payment-method-accordion-body">
                                     <div className="payment-method-tile-grid">
                                         {grouped[type].map((method) => {
                                             const active = method.key === paymentMethod;
@@ -2425,6 +2849,8 @@ function PaymentMethodPicker({
                                             );
                                         })}
                                     </div>
+                                    {grouped[type].some((method) => method.key === paymentMethod) && (
+                                        <>
                                     {type === 'CRYPTO' && grouped[type].some((method) => method.key === paymentMethod) && (
                                         <CryptoNetworkSelector
                                             networks={cryptoNetworks}
@@ -2443,34 +2869,44 @@ function PaymentMethodPicker({
                                             disabled={disabled}
                                         />
                                     )}
-                                </>
+                                            {onAction && (
+                                                <div className="actions payment-actions payment-actions--scoped">
+                                                    <button type="button" className="button primary" onClick={onAction} disabled={actionDisabled}>
+	                                                        {actionBusy ? <LoadingButtonLabel label={actionLoadingLabel || actionLabel || messages.loading} /> : (actionLabel || messages.continue)}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             )}
                         </section>
                     ))}
                 </div>
             ) : loaded && !loading && !error ? (
                 <div className="payment-method-empty">
-                    No payment methods are available for this country yet.
+	                    {messages.noPaymentMethods}
                 </div>
             ) : !loading && !error ? (
-                <div className="payment-method-status">Loading payment methods...</div>
+	                <div className="payment-method-status">{messages.loadingPaymentMethods}</div>
             ) : null}
         </div>
     );
 }
 
 function MobileMoneyPhoneSelector({ buyer, selectedCountry, onChangeDigits, disabled }) {
+    const messages = useCommerceMessages();
     const localPhone = nationalPhoneNumber(buyer?.phone, selectedCountry);
 
     return (
         <div className="mobile-money-phone-panel">
-            <label className="mobile-money-phone-label">Mobile Money phone number</label>
+            <label className="mobile-money-phone-label">{messages.mobileMoneyPhone}</label>
             <div className="mobile-money-phone-row">
                 <input
                     className="mobile-money-code-input"
                     value={`+${selectedCountry?.callingCode || '243'}`}
                     readOnly
-                    aria-label="Country code"
+                    aria-label={messages.countryCode}
                     disabled={disabled}
                 />
                 <input
@@ -2488,16 +2924,17 @@ function MobileMoneyPhoneSelector({ buyer, selectedCountry, onChangeDigits, disa
 }
 
 function MobileMoneyPromptModal({ number, hint, onClose }) {
-    const target = hint || formatPhone(number) || 'your phone';
+    const messages = useCommerceMessages();
+    const target = hint || formatPhone(number) || messages.yourPhone;
     return (
         <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
             <div className="payment-action-modal" onClick={(event) => event.stopPropagation()}>
                 <div className="payment-action-header">
-                    <h3>Confirm on your phone</h3>
-                    <button type="button" className="payment-action-close" onClick={onClose}>Close</button>
+                    <h3>{messages.confirmOnPhone}</h3>
+                    <button type="button" className="payment-action-close" onClick={onClose}>{messages.close}</button>
                 </div>
                 <p className="payment-action-copy">
-                    We sent a Mobile Money payment request to <strong>{target}</strong>. Approve it on your phone to complete the order.
+	                    {interpolate(messages.mobileMoneyPrompt, { target })}
                 </p>
             </div>
         </div>
@@ -2505,6 +2942,7 @@ function MobileMoneyPromptModal({ number, hint, onClose }) {
 }
 
 function PaymentSuccessModal({ reference, total, onReceipt, onClose }) {
+    const messages = useCommerceMessages();
     return (
         <div className="payment-action-backdrop payment-success-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
             <div className="payment-action-modal payment-success-modal" onClick={(event) => event.stopPropagation()}>
@@ -2517,41 +2955,42 @@ function PaymentSuccessModal({ reference, total, onReceipt, onClose }) {
                     <span />
                 </div>
                 <div className="payment-action-header payment-success-header">
-                    <span className="payment-success-kicker">Order confirmed</span>
-                    <button type="button" className="payment-action-close" onClick={onClose}>Close</button>
+	                    <span className="payment-success-kicker">{messages.orderConfirmed}</span>
+	                    <button type="button" className="payment-action-close" onClick={onClose}>{messages.close}</button>
                 </div>
                 <div className="payment-success-mark-wrap">
                     <div className="payment-success-ring" aria-hidden="true" />
                     <div className="payment-success-mark" aria-hidden="true">✓</div>
                 </div>
-                <h3 className="payment-success-title">Payment received</h3>
+	                <h3 className="payment-success-title">{messages.paymentReceived}</h3>
                 <p className="payment-action-copy payment-success-copy">
-                    Your payment is confirmed and the merchant has been notified.
+	                    {messages.paymentReceivedBody}
                 </p>
                 <div className="payment-success-receipt">
                     {total && (
                         <div>
-                            <span>Total paid</span>
+	                            <span>{messages.totalPaid}</span>
                             <strong>{total}</strong>
                         </div>
                     )}
                     {reference && (
                         <div>
-                            <span>Order</span>
+	                            <span>{messages.order}</span>
                             <strong>{reference}</strong>
                         </div>
                     )}
                 </div>
-                <button type="button" className="payment-success-done" onClick={onClose}>Done</button>
-                <button type="button" className="payment-success-receipt-button" onClick={onReceipt}>Reçu</button>
+	                <button type="button" className="payment-success-done" onClick={onClose}>{messages.done}</button>
+	                <button type="button" className="payment-success-receipt-button" onClick={onReceipt}>{messages.receipt}</button>
             </div>
         </div>
     );
 }
 
 function CommerceReceiptModal({ receipt, onClose }) {
+    const messages = useCommerceMessages();
     const paidAt = receipt?.date ? new Date(receipt.date) : new Date();
-    const paidAtLabel = Number.isNaN(paidAt.getTime()) ? '' : paidAt.toLocaleString(undefined, {
+    const paidAtLabel = Number.isNaN(paidAt.getTime()) ? '' : paidAt.toLocaleString(FORMAT_LOCALE, {
         dateStyle: 'medium',
         timeStyle: 'short',
     });
@@ -2562,7 +3001,7 @@ function CommerceReceiptModal({ receipt, onClose }) {
             <div className="commerce-receipt" onClick={(event) => event.stopPropagation()}>
                 <div className="commerce-receipt-head">
                     <div className="brand-mark" aria-hidden="true" />
-                    <span>REÇU</span>
+	                    <span>{messages.receiptBadge}</span>
                 </div>
                 <div className="commerce-receipt-store">
                     <strong>{receipt?.storeName || 'Fondeka Commerce'}</strong>
@@ -2572,29 +3011,30 @@ function CommerceReceiptModal({ receipt, onClose }) {
                 <div className="commerce-receipt-items">
                     {items.map(({ product, quantity }) => (
                         <div key={product?.id || product?.slug || product?.name}>
-                            <span>{product?.name || 'Product'} × {quantity}</span>
+	                            <span>{product?.name || messages.product} × {quantity}</span>
                             <strong>{amount(number(product?.priceAmount) * number(quantity), product?.priceCurrency)}</strong>
                         </div>
                     ))}
                 </div>
                 <div className="commerce-receipt-total">
-                    <span>Total</span>
+	                    <span>{messages.total}</span>
                     <strong>{amount(receipt?.totalAmount, receipt?.totalCurrency)}</strong>
                 </div>
-                {receipt?.customerName && <InfoLine label="Client" value={receipt.customerName} />}
-                {receipt?.paidVia && <InfoLine label="Paid via" value={receipt.paidVia} />}
+	                {receipt?.customerName && <InfoLine label={messages.client} value={receipt.customerName} />}
+	                {receipt?.paidVia && <InfoLine label={messages.paidVia} value={receipt.paidVia} />}
                 {receipt?.status && <div className="commerce-receipt-status">{receipt.status}</div>}
                 <div className="commerce-receipt-footer">
-                    <span>Powered by</span>
+	                    <span>{messages.poweredBy}</span>
                     <strong>FONDEKA</strong>
                 </div>
-                <button type="button" className="payment-success-done" onClick={onClose}>Close</button>
+	                <button type="button" className="payment-success-done" onClick={onClose}>{messages.close}</button>
             </div>
         </div>
     );
 }
 
 function CryptoPaymentModal({ address, amount, networkName, invoiceUrl, expiresAt, hint, onClose }) {
+    const messages = useCommerceMessages();
     const qrValue = invoiceUrl || address;
     const qrSrc = qrValue
         ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=12&data=${encodeURIComponent(qrValue)}`
@@ -2605,31 +3045,31 @@ function CryptoPaymentModal({ address, amount, networkName, invoiceUrl, expiresA
         <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
             <div className="payment-action-modal payment-action-modal--crypto" onClick={(event) => event.stopPropagation()}>
                 <div className="payment-action-header">
-                    <h3>Send crypto payment</h3>
-                    <button type="button" className="payment-action-close" onClick={onClose}>Close</button>
+                    <h3>{messages.sendCryptoPayment}</h3>
+                    <button type="button" className="payment-action-close" onClick={onClose}>{messages.close}</button>
                 </div>
 
                 {hint && <div className="payment-action-hint">{hint}</div>}
 
                 <div className="crypto-payment-content">
                     <div className="crypto-payment-qr">
-                        {qrSrc ? <img src={qrSrc} alt="" /> : <span>QR unavailable</span>}
+	                        {qrSrc ? <img src={qrSrc} alt="" /> : <span>{messages.qrUnavailable}</span>}
                     </div>
 
                     <div className="crypto-payment-details">
-                        <ReviewSummaryLine label="Amount" value={amount || '-'} highlight />
-                        <ReviewSummaryLine label="Network" value={networkName || '-'} />
-                        {expiryLabel && <ReviewSummaryLine label="Expires" value={expiryLabel} />}
+	                        <ReviewSummaryLine label={messages.amount} value={amount || '-'} highlight />
+	                        <ReviewSummaryLine label={messages.network} value={networkName || '-'} />
+	                        {expiryLabel && <ReviewSummaryLine label={messages.expires} value={expiryLabel} />}
                         <div className="crypto-address-block">
-                            <span>Address</span>
+	                            <span>{messages.address}</span>
                             <code title={address}>{address || '-'}</code>
                         </div>
                         <button type="button" className="payment-action-copy-button" onClick={() => copyToClipboard(address)}>
-                            Copy address
+	                            {messages.copyAddress}
                         </button>
                         {invoiceUrl && (
                             <a className="payment-action-copy-button payment-action-link-button" href={invoiceUrl} target="_blank" rel="noreferrer">
-                                Open invoice
+	                                {messages.openInvoice}
                             </a>
                         )}
                     </div>
@@ -2640,6 +3080,7 @@ function CryptoPaymentModal({ address, amount, networkName, invoiceUrl, expiresA
 }
 
 function PaymentReviewSheet({ quote, method, network, account, busy, onClose, onConfirm }) {
+    const messages = useCommerceMessages();
     if (!quote) return null;
     const netAmount = quote.netAmount ?? quote.billingAmount ?? quote.itemSubtotalAmount;
     const netCurrency = quote.netAmountCurrency || quote.billingCurrency || quote.itemSubtotalCurrency || quote.totalCurrency;
@@ -2658,25 +3099,25 @@ function PaymentReviewSheet({ quote, method, network, account, busy, onClose, on
             <div className="payment-review-sheet" onClick={(event) => event.stopPropagation()}>
                 <div className="payment-review-handle" aria-hidden="true" />
                 <div className="payment-review-sheet-header">
-                    <h3>Review payment</h3>
-                    <button type="button" className="payment-review-close" onClick={onClose}>Close</button>
+                    <h3>{messages.reviewPayment}</h3>
+                    <button type="button" className="payment-review-close" onClick={onClose}>{messages.close}</button>
                 </div>
 
                 <div className="payment-review-summary">
-                    <ReviewSummaryLine label="Checkout amount" value={amount(netAmount, netCurrency)} />
-                    <ReviewSummaryLine label="Fees" value={fees != null ? amount(fees, feeCurrency) : '-'} />
-                    <ReviewSummaryLine label="Total to pay" value={amount(total, totalCurrency)} highlight />
+	                    <ReviewSummaryLine label={messages.checkoutAmount} value={amount(netAmount, netCurrency)} />
+	                    <ReviewSummaryLine label={messages.fees} value={fees != null ? amount(fees, feeCurrency) : '-'} />
+	                    <ReviewSummaryLine label={messages.totalToPay} value={amount(total, totalCurrency)} highlight />
                     {showRailAmount && (
-                        <ReviewSummaryLine label="Rail amount" value={amount(railAmount, railCurrency)} highlight />
+	                        <ReviewSummaryLine label={messages.railAmount} value={amount(railAmount, railCurrency)} highlight />
                     )}
-                    {method && <ReviewSummaryLine label="Method" value={method.name} />}
-                    {network && <ReviewSummaryLine label="Network" value={network.displayName || network.name} />}
-                    {account && <ReviewSummaryLine label="Account" value={account} />}
+	                    {method && <ReviewSummaryLine label={messages.method} value={method.name} />}
+	                    {network && <ReviewSummaryLine label={messages.network} value={network.displayName || network.name} />}
+	                    {account && <ReviewSummaryLine label={messages.account} value={account} />}
                 </div>
 
                 <div className="payment-review-actions">
                     <button type="button" className="payment-review-action payment-review-action--secondary" onClick={onClose}>
-                        Back
+                        {messages.back}
                     </button>
                     <button
                         type="button"
@@ -2684,7 +3125,7 @@ function PaymentReviewSheet({ quote, method, network, account, busy, onClose, on
                         onClick={onConfirm}
                         disabled={busy}
                     >
-                        {busy ? 'Submitting...' : 'Confirm payment'}
+                        {busy ? messages.submitting : messages.confirmPayment}
                     </button>
                 </div>
             </div>
@@ -2702,10 +3143,11 @@ function ReviewSummaryLine({ label, value, highlight = false }) {
 }
 
 function CryptoNetworkSelector({ networks, loading, error, selectedNetworkId, onSelect, disabled }) {
+    const messages = useCommerceMessages();
     return (
         <div className="crypto-network-panel">
-            <div className="crypto-network-label">Network</div>
-            {loading && <div className="payment-method-status">Loading crypto networks...</div>}
+            <div className="crypto-network-label">{messages.network}</div>
+            {loading && <div className="payment-method-status">{messages.loadingCryptoNetworks}</div>}
             {error && <div className="payment-method-status payment-method-status--error">{error.message}</div>}
             {!loading && !error && networks?.length ? (
                 <div className="crypto-network-pills">
@@ -2728,13 +3170,14 @@ function CryptoNetworkSelector({ networks, loading, error, selectedNetworkId, on
                 </div>
             ) : null}
             {!loading && !error && !networks?.length && (
-                <div className="payment-method-status">No crypto networks are available for this method.</div>
+                <div className="payment-method-status">{messages.noCryptoNetworks}</div>
             )}
         </div>
     );
 }
 
 function CountryPickerModal({ open, countries, query, selectedCode, onQueryChange, onClose, onSelect }) {
+    const messages = useCommerceMessages();
     if (!open) return null;
 
     return (
@@ -2742,15 +3185,15 @@ function CountryPickerModal({ open, countries, query, selectedCode, onQueryChang
             <div className="country-sheet" onClick={(event) => event.stopPropagation()}>
                 <div className="country-sheet-handle" aria-hidden="true" />
                 <div className="country-sheet-header">
-                    <h3>Choose country</h3>
-                    <button type="button" className="country-sheet-close" onClick={onClose}>Close</button>
+                    <h3>{messages.chooseCountry}</h3>
+                    <button type="button" className="country-sheet-close" onClick={onClose}>{messages.close}</button>
                 </div>
                 <div className="country-search-wrap">
                     <input
                         className="country-search-input"
                         value={query}
                         onChange={(event) => onQueryChange(event.currentTarget.value)}
-                        placeholder="Search country"
+                        placeholder={messages.searchCountry}
                     />
                 </div>
                 <div className="country-list">
@@ -2773,7 +3216,7 @@ function CountryPickerModal({ open, countries, query, selectedCode, onQueryChang
                         );
                     })}
                     {!countries.length && (
-                        <div className="country-empty-state">No countries found.</div>
+	                        <div className="country-empty-state">{messages.noCountriesFound}</div>
                     )}
                 </div>
             </div>
@@ -2786,35 +3229,37 @@ function InlineError({ message }) {
 }
 
 function Unavailable({ message }) {
+    const messages = useCommerceMessages();
     return (
         <div className="unavailable">
-            <strong>Commerce unavailable</strong>
-            <span>{message || 'Fondeka Commerce is not available yet.'}</span>
+            <strong>{messages.commerceUnavailable}</strong>
+            <span>{message || messages.unavailableFallback}</span>
         </div>
     );
 }
 
 function MoneySummary({ data }) {
+    const messages = useCommerceMessages();
     return (
         <div className="money-summary">
             <div>
-                <span>Checkout amount</span>
+                <span>{messages.checkoutAmount}</span>
                 <strong>{amount(data.netAmount ?? data.itemSubtotalAmount, data.netAmountCurrency ?? data.itemSubtotalCurrency)}</strong>
             </div>
             <div>
-                <span>Fee</span>
+                <span>{messages.fee}</span>
                 <strong>{amount(data.feeAmount, data.feeCurrency)}</strong>
             </div>
             <div className="money-total">
-                <span>Total to pay</span>
+                <span>{messages.totalToPay}</span>
                 <strong>{amount(data.grossAmount ?? data.totalAmount, data.grossAmountCurrency ?? data.totalCurrency)}</strong>
             </div>
             <div>
-                <span>Billing amount</span>
+                <span>{messages.billingAmount}</span>
                 <strong>{amount(data.billingAmount, data.billingCurrency)}</strong>
             </div>
             <div>
-                <span>Payment amount</span>
+                <span>{messages.paymentAmount}</span>
                 <strong>{amount(data.paymentAmount, data.paymentCurrency)}</strong>
             </div>
             {data.fxSnapshot && <FxDetails fx={data.fxSnapshot} />}
@@ -2823,36 +3268,40 @@ function MoneySummary({ data }) {
 }
 
 function PaymentHandoff({ order }) {
+    const messages = useCommerceMessages();
     const status = String(order?.status || '').toUpperCase();
     if (status === 'PAID') {
         return (
             <div className="payment-handoff payment-handoff--paid">
-                <strong>Payment collected</strong>
-                <span>Your order payment has been received.</span>
+                <strong>{messages.paymentCollected}</strong>
+                <span>{messages.orderPaymentReceived}</span>
             </div>
         );
     }
 
     return (
         <div className="payment-handoff">
-            <strong>Waiting for payment</strong>
-            <span>
-                Public web payment is not available yet. Fondeka Balance payment is currently handled from the authenticated app flow.
-            </span>
+            <strong>{messages.waitingForPayment}</strong>
+            <span>{messages.webPaymentPending}</span>
         </div>
     );
 }
 
 function FxDetails({ fx }) {
+    const messages = useCommerceMessages();
     return (
         <div className="fx-details">
-            Converted from {amount(fx.sourceAmount, fx.sourceCurrency)} to {amount(fx.targetAmount, fx.targetCurrency)}.
-            {fx.provider && <span> Provider {fx.provider}.</span>}
+            {interpolate(messages.convertedFromTo, {
+                source: amount(fx.sourceAmount, fx.sourceCurrency),
+                target: amount(fx.targetAmount, fx.targetCurrency),
+            })}
+            {fx.provider && <span> {interpolate(messages.provider, { provider: fx.provider })}</span>}
         </div>
     );
 }
 
 function ProductImageGallery({ product, index = 0, onIndexChange, onClose }) {
+    const messages = useCommerceMessages();
     const images = productImages(product);
     if (!images.length) return null;
 
@@ -2865,39 +3314,39 @@ function ProductImageGallery({ product, index = 0, onIndexChange, onClose }) {
     };
 
     return (
-        <div className="image-gallery-backdrop" role="dialog" aria-modal="true" aria-label={`${product.name} images`} onClick={onClose}>
+        <div className="image-gallery-backdrop" role="dialog" aria-modal="true" aria-label={messages.productImages} onClick={onClose}>
             <section className="image-gallery" onClick={(event) => event.stopPropagation()}>
                 <div className="image-gallery-header">
                     <div>
                         <strong>{product.name}</strong>
                         {hasMany && <span>{safeIndex + 1} / {images.length}</span>}
                     </div>
-                    <button type="button" onClick={onClose} aria-label="Close image gallery">x</button>
+                    <button type="button" onClick={onClose} aria-label={messages.imageGalleryClose}>x</button>
                 </div>
 
                 <div className="image-gallery-stage">
                     {hasMany && (
-                        <button type="button" className="image-gallery-nav image-gallery-nav--prev" onClick={() => goTo(safeIndex - 1)} aria-label="Previous image">
+                        <button type="button" className="image-gallery-nav image-gallery-nav--prev" onClick={() => goTo(safeIndex - 1)} aria-label={messages.previousImage}>
                             ‹
                         </button>
                     )}
                     <img src={currentImage} alt={product.name || ''} />
                     {hasMany && (
-                        <button type="button" className="image-gallery-nav image-gallery-nav--next" onClick={() => goTo(safeIndex + 1)} aria-label="Next image">
+                        <button type="button" className="image-gallery-nav image-gallery-nav--next" onClick={() => goTo(safeIndex + 1)} aria-label={messages.nextImage}>
                             ›
                         </button>
                     )}
                 </div>
 
                 {hasMany && (
-                    <div className="image-gallery-thumbs" aria-label="Choose image">
+                    <div className="image-gallery-thumbs" aria-label={messages.chooseImage}>
                         {images.map((image, thumbIndex) => (
                             <button
                                 type="button"
                                 key={image}
                                 className={thumbIndex === safeIndex ? 'image-gallery-thumb--active' : ''}
                                 onClick={() => goTo(thumbIndex)}
-                                aria-label={`Show image ${thumbIndex + 1}`}
+                                aria-label={interpolate(messages.showImage, { number: thumbIndex + 1 })}
                                 aria-pressed={thumbIndex === safeIndex}
                             >
                                 <img src={image} alt="" />
@@ -2911,31 +3360,32 @@ function ProductImageGallery({ product, index = 0, onIndexChange, onClose }) {
 }
 
 function ProductDialog({ product, quantity, onClose, onOpenGallery, onIncrement, onDecrement }) {
-    const out = inventoryLabel(product) === 'Out of stock';
+    const messages = useCommerceMessages();
+    const out = inventoryLabel(product, messages) === messages.outOfStock;
     const images = productImages(product);
     const image = images[0];
     return (
         <div className="dialog-backdrop" onClick={onClose} role="presentation">
             <section className="dialog" role="dialog" aria-modal="true" aria-label={product.name} onClick={(event) => event.stopPropagation()}>
-                <button className="dialog-close" onClick={onClose} aria-label="Close">x</button>
+                <button className="dialog-close" onClick={onClose} aria-label={messages.close}>x</button>
                 <button
                     type="button"
                     className="dialog-preview dialog-preview--button"
                     onClick={() => image && onOpenGallery?.(0)}
                     disabled={!image}
-                    aria-label={image ? `Zoom ${product.name}` : product.name}
+                    aria-label={image ? interpolate(messages.zoomProduct, { name: product.name }) : product.name}
                 >
                     {image ? <img src={image} alt="" /> : initials(product.name)}
-                    {images.length > 1 && <span className="product-image-count">{images.length} photos</span>}
+                    {images.length > 1 && <span className="product-image-count">{images.length} {messages.photos}</span>}
                 </button>
                 {images.length > 1 && (
-                    <div className="dialog-gallery-strip" aria-label="Product images">
+                    <div className="dialog-gallery-strip" aria-label={messages.productImages}>
                         {images.map((item, index) => (
                             <button
                                 type="button"
                                 key={item}
                                 onClick={() => onOpenGallery?.(index)}
-                                aria-label={`View image ${index + 1} of ${images.length}`}
+                                aria-label={interpolate(messages.viewImageOf, { number: index + 1, total: images.length })}
                             >
                                 <img src={item} alt="" />
                             </button>
@@ -2943,10 +3393,10 @@ function ProductDialog({ product, quantity, onClose, onOpenGallery, onIncrement,
                     </div>
                 )}
                 <h2>{product.name}</h2>
-                <p>{product.description || 'No description provided.'}</p>
+                <p>{product.description || messages.noDescription}</p>
                 <div className="product-meta">
                     <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
-                    <span>{inventoryLabel(product)}</span>
+                    <span>{inventoryLabel(product, messages)}</span>
                 </div>
                 <Quantity quantity={quantity} onIncrement={onIncrement} onDecrement={onDecrement} disabled={out} />
             </section>
