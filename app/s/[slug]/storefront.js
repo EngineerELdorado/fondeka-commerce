@@ -183,11 +183,28 @@ const COMMERCE_MESSAGES = {
         available: 'Available',
         outOfStock: 'Out of stock',
         availableQuantity: '{quantity} available',
+        productTypeLabels: { PHYSICAL: 'Physical', DIGITAL: 'Digital', SERVICE: 'Service' },
+        digitalDelivery: 'Digital delivery',
+        digitalDeliveryHelp: 'Access is provided after payment. No shipping is needed.',
+        servicePurchase: 'Service booking',
+        servicePurchaseHelp: 'This purchase is for a service. No shipping is needed.',
+        physicalDelivery: 'Physical item',
+        fulfillment: 'Fulfillment',
+        accessLink: 'Access link',
+        bookingLink: 'Booking link',
+        download: 'Download',
+        openAccessLink: 'Open access link',
+        downloadAccessInstructions: 'Download/access instructions',
+        serviceInstructions: 'Service instructions',
+        physicalConfirmation: 'The merchant will use your contact details for delivery or pickup follow-up.',
         chooseAtLeastOneProduct: 'Choose at least one product.',
+        buyerNameRequired: 'Customer name is required.',
+        buyerEmailRequired: 'Customer email is required.',
+        buyerPhoneRequired: 'Customer phone number is required.',
         billingCurrencyRequired: 'Billing currency is required.',
         paymentCurrencyRequired: 'Payment currency is required.',
         methodNotConfigured: '{method} is not configured for web checkout yet.',
-        buyerPhoneRequired: 'Buyer phone is required for Mobile Money.',
+        mobileMoneyPhoneRequired: 'Customer phone number is required for Mobile Money.',
         chooseCryptoNetwork: 'Choose a crypto network.',
         unableToLoadPaymentMethods: 'Unable to load payment methods.',
         noPaymentMethodAvailable: 'No payment method is available for this checkout.',
@@ -354,11 +371,28 @@ const COMMERCE_MESSAGES = {
         available: 'Disponible',
         outOfStock: 'Rupture de stock',
         availableQuantity: '{quantity} disponible(s)',
+        productTypeLabels: { PHYSICAL: 'Physique', DIGITAL: 'Digital', SERVICE: 'Service' },
+        digitalDelivery: 'Livraison digitale',
+        digitalDeliveryHelp: 'L’accès est fourni après paiement. Aucune livraison physique n’est nécessaire.',
+        servicePurchase: 'Service / réservation',
+        servicePurchaseHelp: 'Cet achat concerne un service. Aucune livraison physique n’est nécessaire.',
+        physicalDelivery: 'Article physique',
+        fulfillment: 'Livraison / accès',
+        accessLink: 'Lien d’accès',
+        bookingLink: 'Lien de réservation',
+        download: 'Télécharger',
+        openAccessLink: 'Ouvrir le lien d’accès',
+        downloadAccessInstructions: 'Instructions d’accès',
+        serviceInstructions: 'Instructions du service',
+        physicalConfirmation: 'Le marchand utilisera vos coordonnées pour le suivi de livraison ou de retrait.',
         chooseAtLeastOneProduct: 'Choisissez au moins un produit.',
+        buyerNameRequired: 'Le nom du client est obligatoire.',
+        buyerEmailRequired: 'L’email du client est obligatoire.',
+        buyerPhoneRequired: 'Le numéro de téléphone du client est obligatoire.',
         billingCurrencyRequired: 'La devise de facturation est obligatoire.',
         paymentCurrencyRequired: 'La devise de paiement est obligatoire.',
         methodNotConfigured: '{method} n’est pas encore configurée pour le paiement web.',
-        buyerPhoneRequired: 'Le téléphone du client est obligatoire pour Mobile Money.',
+        mobileMoneyPhoneRequired: 'Le numéro de téléphone du client est obligatoire pour Mobile Money.',
         chooseCryptoNetwork: 'Choisissez un réseau crypto.',
         unableToLoadPaymentMethods: 'Impossible de charger les méthodes de paiement.',
         noPaymentMethodAvailable: 'Aucune méthode de paiement n’est disponible pour ce paiement.',
@@ -679,7 +713,7 @@ function groupedPaymentMethods(methods) {
 }
 
 function hasBuyerDetails(buyer) {
-    return !!(buyer?.name?.trim() || buyer?.email?.trim() || buyer?.phone?.trim());
+    return !!(buyer?.name?.trim() && buyer?.email?.trim() && buyer?.phone?.trim());
 }
 
 function readStoredBuyerDetails() {
@@ -769,6 +803,34 @@ function productImages(product) {
         .map((image) => String(image || '').trim())
         .filter(Boolean)
         .filter((image, index, images) => images.indexOf(image) === index);
+}
+
+function productType(product) {
+    const value = String(product?.productType || product?.type || 'PHYSICAL').trim().toUpperCase();
+    return ['PHYSICAL', 'DIGITAL', 'SERVICE'].includes(value) ? value : 'PHYSICAL';
+}
+
+function productFulfillment(product) {
+    return {
+        type: productType(product),
+        instructions: String(product?.fulfillmentInstructions || '').trim(),
+    };
+}
+
+function orderFulfillmentItems(order) {
+    const orderItems = Array.isArray(order?.items) ? order.items : [];
+
+    return orderItems
+        .map((item) => ({
+            key: item.id || item.productId || item.productSlug || item.productName,
+            name: item.productName || item.name || '',
+            quantity: item.quantity,
+            type: productType({ productType: item.productType }),
+            instructions: String(item.fulfillmentInstructions || '').trim(),
+            downloadUrl: String(item.downloadUrl || '').trim(),
+            fulfillmentUrl: String(item.fulfillmentUrl || '').trim(),
+        }))
+        .filter((item) => item.name);
 }
 
 function getFondekaCommerceSchemeBase() {
@@ -1156,12 +1218,15 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
     const validate = () => {
         if (!cartItems.length) return messages.chooseAtLeastOneProduct;
+        if (!buyer.name.trim()) return messages.buyerNameRequired;
+        if (!buyer.email.trim()) return messages.buyerEmailRequired;
+        if (!buyer.phone.trim()) return messages.buyerPhoneRequired;
         const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
         if (!cartCurrency && !currencies.billingCurrency.trim()) return messages.billingCurrencyRequired;
         if (!cartCurrency && !currencies.paymentCurrency.trim()) return messages.paymentCurrencyRequired;
         const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
         if (!selectedMethod?.id) return interpolate(messages.methodNotConfigured, { method: selectedMethod?.name || messages.paymentMethod });
-        if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return messages.buyerPhoneRequired;
+        if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return messages.mobileMoneyPhoneRequired;
         if (selectedMethod.type === 'CRYPTO' && !selectedCryptoNetworkId) return messages.chooseCryptoNetwork;
         return null;
     };
@@ -1459,6 +1524,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
 
     useEffect(() => {
         if (!isOrderPaid(order)) return;
+        const fulfillmentItems = orderFulfillmentItems(order);
         setPaymentReviewOpen(false);
         setPaymentReviewContext(null);
         setPaymentPrompt((current) => (
@@ -1467,12 +1533,16 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 : {
                     type: 'PAID',
                     reference: order?.reference || '',
+                    accessToken: order?.accessToken || '',
                     total: amount(order?.totalAmount ?? order?.paymentAmount, order?.totalCurrency || order?.paymentCurrency),
+                    fulfillmentItems,
                     receipt: {
                         reference: order?.reference || '',
+                        accessToken: order?.accessToken || '',
                         storeName: store?.name || 'Fondeka Commerce',
                         date: new Date().toISOString(),
                         items: cartItems,
+                        fulfillmentItems,
                         totalAmount: order?.totalAmount ?? order?.paymentAmount,
                         totalCurrency: order?.totalCurrency || order?.paymentCurrency,
                         customerName: buyer?.name || '',
@@ -1481,7 +1551,29 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     },
                 }
         ));
-    }, [buyer?.name, cartItems, order?.paymentAmount, order?.paymentCurrency, order?.paymentTransactionStatus, order?.reference, order?.status, order?.totalAmount, order?.totalCurrency, selectedPaymentMethod?.name, store?.name]);
+    }, [buyer?.name, cartItems, order?.accessToken, order?.items, order?.paymentAmount, order?.paymentCurrency, order?.paymentTransactionStatus, order?.reference, order?.status, order?.totalAmount, order?.totalCurrency, selectedPaymentMethod?.name, store?.name]);
+
+    const refreshPaidFulfillment = async () => {
+        const reference = paymentPrompt?.reference || order?.reference;
+        const accessToken = paymentPrompt?.accessToken || order?.accessToken;
+        if (!reference || !accessToken) return [];
+
+        const latest = await apiFetch(
+            `/public/commerce/orders/${encodeURIComponent(reference)}?accessToken=${encodeURIComponent(accessToken)}`
+        );
+        setOrder(latest);
+        const fulfillmentItems = orderFulfillmentItems(latest);
+        setPaymentPrompt((current) => (
+            current?.type === 'PAID'
+                ? {
+                    ...current,
+                    fulfillmentItems,
+                    receipt: current.receipt ? { ...current.receipt, fulfillmentItems } : current.receipt,
+                }
+                : current
+        ));
+        return fulfillmentItems;
+    };
 
     if (loading) {
         return withMessages(<Screen><StateCard title={messages.loadingStorefront} /></Screen>);
@@ -1569,16 +1661,22 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             hint={paymentPrompt.hint}
             onClose={() => setPaymentPrompt(null)}
         />
-    ) : paymentPrompt?.type === 'PAID' ? (
+	    ) : paymentPrompt?.type === 'PAID' ? (
         <PaymentSuccessModal
             reference={paymentPrompt.reference}
             total={paymentPrompt.total}
+            fulfillmentItems={paymentPrompt.fulfillmentItems}
+            onRefreshFulfillment={refreshPaidFulfillment}
             onReceipt={() => setReceiptOpen(true)}
             onClose={() => setPaymentPrompt(null)}
         />
     ) : null;
     const receiptModal = receiptOpen && paymentPrompt?.receipt ? (
-        <CommerceReceiptModal receipt={paymentPrompt.receipt} onClose={() => setReceiptOpen(false)} />
+        <CommerceReceiptModal
+            receipt={paymentPrompt.receipt}
+            onRefreshFulfillment={refreshPaidFulfillment}
+            onClose={() => setReceiptOpen(false)}
+        />
     ) : null;
 
     if (order && showOrderPaymentView) {
@@ -2127,6 +2225,87 @@ function StarRating({ stars, label }) {
     );
 }
 
+function ProductTypeBadge({ product }) {
+    const messages = useCommerceMessages();
+    const type = productType(product);
+    if (type === 'PHYSICAL') return null;
+    return (
+        <span className={`product-type-badge product-type-badge--${type.toLowerCase()}`}>
+            {messages.productTypeLabels[type] || type}
+        </span>
+    );
+}
+
+function ProductFulfillmentNote({ product, compact = false }) {
+    const messages = useCommerceMessages();
+    const fulfillment = productFulfillment(product);
+    const type = fulfillment.type;
+    if (type === 'PHYSICAL') return null;
+
+    const title = type === 'DIGITAL' ? messages.digitalDelivery : messages.servicePurchase;
+    const help = type === 'DIGITAL' ? messages.digitalDeliveryHelp : messages.servicePurchaseHelp;
+
+    return (
+        <div className={`fulfillment-note${compact ? ' fulfillment-note--compact' : ''}`}>
+            <strong>{title}</strong>
+            <span>{fulfillment.instructions || help}</span>
+        </div>
+    );
+}
+
+function paidFulfillmentItemKey(item) {
+    return String(item?.key || item?.name || '').trim();
+}
+
+function PaidFulfillmentList({ items, onRefresh }) {
+    const messages = useCommerceMessages();
+    const fulfillmentItems = (Array.isArray(items) ? items : [])
+        .filter((item) => item.type !== 'PHYSICAL')
+        .filter((item) => item.downloadUrl || item.fulfillmentUrl || item.instructions);
+    if (!fulfillmentItems.length) return null;
+
+    const openDownload = async (item) => {
+        let url = item.downloadUrl;
+        if (onRefresh) {
+            try {
+                const refreshedItems = await onRefresh();
+                const freshItem = (Array.isArray(refreshedItems) ? refreshedItems : [])
+                    .find((candidate) => paidFulfillmentItemKey(candidate) === paidFulfillmentItemKey(item));
+                url = freshItem?.downloadUrl || url;
+            } catch {
+                // Keep the current backend download URL usable if a refresh has a transient failure.
+            }
+        }
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
+    return (
+        <section className="paid-fulfillment-list">
+            <h4>{messages.fulfillment}</h4>
+            {fulfillmentItems.map((item) => {
+                const isDigital = item.type === 'DIGITAL';
+                return (
+                    <div className="paid-fulfillment-item" key={item.key || item.name}>
+                        <strong>{item.name}</strong>
+                        <span>{isDigital ? messages.downloadAccessInstructions : messages.serviceInstructions}</span>
+                        {item.instructions && <p>{item.instructions}</p>}
+                        {item.downloadUrl && (
+                            <button type="button" className="paid-fulfillment-link" onClick={() => openDownload(item)}>
+                                {messages.download}
+                            </button>
+                        )}
+                        {item.fulfillmentUrl && (
+                            <a href={item.fulfillmentUrl} target="_blank" rel="noreferrer">
+                                {messages.openAccessLink}
+                            </a>
+                        )}
+                    </div>
+                );
+            })}
+        </section>
+    );
+}
+
 function StoreReviews({ reviews, storeName }) {
     const messages = useCommerceMessages();
     if (!reviews?.length) {
@@ -2196,6 +2375,7 @@ function ProfileProductCard({ product, quantity, onOpen, onAdd, onRemove }) {
             </button>
             <div className="profile-product-body">
                 <button type="button" className="profile-product-name" onClick={onOpen}>{product.name || product.slug || messages.product}</button>
+                <ProductTypeBadge product={product} />
                 <strong className="profile-product-price">{amount(product.priceAmount, product.priceCurrency)}</strong>
                 <div className="profile-product-actions">
                     {quantity > 0 && (
@@ -2312,6 +2492,8 @@ function ProductDetailPage({
                         <span>ⓘ</span>
                         <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
                     </div>
+                    <ProductTypeBadge product={product} />
+                    <ProductFulfillmentNote product={product} />
                     {product.description && (
                         <div className="product-description-section">
                             <h2>{messages.description}</h2>
@@ -2515,7 +2697,9 @@ function CheckoutPaymentForm({
                             <div className="cart-line" key={product.id}>
                                 <div>
                                     <strong>{product.name}</strong>
+                                    <ProductTypeBadge product={product} />
                                     <span>{quantity} x {amount(product.priceAmount, product.priceCurrency)}</span>
+                                    <ProductFulfillmentNote product={product} compact />
                                 </div>
                                 <b>{amount(number(product.priceAmount) * number(quantity), product.priceCurrency)}</b>
                             </div>
@@ -2941,7 +3125,7 @@ function MobileMoneyPromptModal({ number, hint, onClose }) {
     );
 }
 
-function PaymentSuccessModal({ reference, total, onReceipt, onClose }) {
+function PaymentSuccessModal({ reference, total, fulfillmentItems, onRefreshFulfillment, onReceipt, onClose }) {
     const messages = useCommerceMessages();
     return (
         <div className="payment-action-backdrop payment-success-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
@@ -2980,6 +3164,7 @@ function PaymentSuccessModal({ reference, total, onReceipt, onClose }) {
                         </div>
                     )}
                 </div>
+                <PaidFulfillmentList items={fulfillmentItems} onRefresh={onRefreshFulfillment} />
 	                <button type="button" className="payment-success-done" onClick={onClose}>{messages.done}</button>
 	                <button type="button" className="payment-success-receipt-button" onClick={onReceipt}>{messages.receipt}</button>
             </div>
@@ -2987,7 +3172,7 @@ function PaymentSuccessModal({ reference, total, onReceipt, onClose }) {
     );
 }
 
-function CommerceReceiptModal({ receipt, onClose }) {
+function CommerceReceiptModal({ receipt, onRefreshFulfillment, onClose }) {
     const messages = useCommerceMessages();
     const paidAt = receipt?.date ? new Date(receipt.date) : new Date();
     const paidAtLabel = Number.isNaN(paidAt.getTime()) ? '' : paidAt.toLocaleString(FORMAT_LOCALE, {
@@ -2995,6 +3180,7 @@ function CommerceReceiptModal({ receipt, onClose }) {
         timeStyle: 'short',
     });
     const items = Array.isArray(receipt?.items) ? receipt.items : [];
+    const fulfillmentItems = Array.isArray(receipt?.fulfillmentItems) ? receipt.fulfillmentItems : [];
 
     return (
         <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
@@ -3023,6 +3209,7 @@ function CommerceReceiptModal({ receipt, onClose }) {
 	                {receipt?.customerName && <InfoLine label={messages.client} value={receipt.customerName} />}
 	                {receipt?.paidVia && <InfoLine label={messages.paidVia} value={receipt.paidVia} />}
                 {receipt?.status && <div className="commerce-receipt-status">{receipt.status}</div>}
+                <PaidFulfillmentList items={fulfillmentItems} onRefresh={onRefreshFulfillment} />
                 <div className="commerce-receipt-footer">
 	                    <span>{messages.poweredBy}</span>
                     <strong>FONDEKA</strong>
@@ -3393,7 +3580,9 @@ function ProductDialog({ product, quantity, onClose, onOpenGallery, onIncrement,
                     </div>
                 )}
                 <h2>{product.name}</h2>
+                <ProductTypeBadge product={product} />
                 <p>{product.description || messages.noDescription}</p>
+                <ProductFulfillmentNote product={product} />
                 <div className="product-meta">
                     <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
                     <span>{inventoryLabel(product, messages)}</span>

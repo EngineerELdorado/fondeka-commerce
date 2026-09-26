@@ -563,6 +563,30 @@ button:disabled {
     font-weight: 950;
 }
 
+.product-type-badge {
+    width: fit-content;
+    border: 1px solid rgba(79, 128, 92, 0.18);
+    border-radius: 999px;
+    padding: 3px 8px;
+    background: #f3f8f5;
+    color: var(--brand-dark);
+    font-size: 10px;
+    font-weight: 950;
+    line-height: 1.2;
+}
+
+.product-type-badge--digital {
+    border-color: rgba(37, 99, 235, 0.18);
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.product-type-badge--service {
+    border-color: rgba(147, 51, 234, 0.18);
+    background: #faf5ff;
+    color: #7e22ce;
+}
+
 .profile-product-actions {
     min-height: 34px;
     display: flex;
@@ -1209,6 +1233,42 @@ button:disabled {
     padding-top: 16px;
 }
 
+.fulfillment-note {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid rgba(79, 128, 92, 0.16);
+    border-radius: 8px;
+    padding: 10px;
+    background: #f8fcfa;
+}
+
+.fulfillment-note strong {
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.fulfillment-note span {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 700;
+}
+
+.fulfillment-note--compact {
+    margin-top: 7px;
+    padding: 8px;
+}
+
+.fulfillment-note--compact strong {
+    font-size: 12px;
+}
+
+.fulfillment-note--compact span {
+    font-size: 12px;
+}
+
 .product-description-section h2 {
     margin: 0;
     color: #0f172a;
@@ -1684,6 +1744,10 @@ button:disabled {
 .cart-line strong,
 .cart-line span {
     display: block;
+}
+
+.cart-line .product-type-badge {
+    margin-top: 5px;
 }
 
 .cart-line strong {
@@ -2961,6 +3025,67 @@ button:disabled {
     font-size: 14px;
     font-weight: 950;
     overflow-wrap: anywhere;
+}
+
+.paid-fulfillment-list {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    text-align: left;
+}
+
+.paid-fulfillment-list h4 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 950;
+}
+
+.paid-fulfillment-item {
+    border: 1px solid rgba(79, 128, 92, 0.16);
+    border-radius: 10px;
+    padding: 10px;
+    background: #f8fcfa;
+}
+
+.paid-fulfillment-item strong,
+.paid-fulfillment-item span,
+.paid-fulfillment-item a,
+.paid-fulfillment-link {
+    display: block;
+}
+
+.paid-fulfillment-item strong {
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.paid-fulfillment-item span,
+.paid-fulfillment-item p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 750;
+}
+
+.paid-fulfillment-item a,
+.paid-fulfillment-link {
+    width: fit-content;
+    margin-top: 8px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--brand-dark);
+    font-size: 13px;
+    font-weight: 950;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
 }
 
 .payment-success-done {
