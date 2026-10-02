@@ -810,6 +810,13 @@ function productType(product) {
     return ['PHYSICAL', 'DIGITAL', 'SERVICE'].includes(value) ? value : 'PHYSICAL';
 }
 
+function productFulfillment(product) {
+    return {
+        type: productType(product),
+        instructions: String(product?.fulfillmentInstructions || '').trim(),
+    };
+}
+
 function orderFulfillmentItems(order) {
     const orderItems = Array.isArray(order?.items) ? order.items : [];
 
@@ -2229,6 +2236,23 @@ function ProductTypeBadge({ product }) {
     );
 }
 
+function ProductFulfillmentNote({ product, compact = false }) {
+    const messages = useCommerceMessages();
+    const fulfillment = productFulfillment(product);
+    const type = fulfillment.type;
+    if (type === 'PHYSICAL') return null;
+
+    const title = type === 'DIGITAL' ? messages.digitalDelivery : messages.servicePurchase;
+    const help = type === 'DIGITAL' ? messages.digitalDeliveryHelp : messages.servicePurchaseHelp;
+
+    return (
+        <div className={`fulfillment-note${compact ? ' fulfillment-note--compact' : ''}`}>
+            <strong>{title}</strong>
+            <span>{fulfillment.instructions || help}</span>
+        </div>
+    );
+}
+
 function paidFulfillmentItemKey(item) {
     return String(item?.key || item?.name || '').trim();
 }
@@ -2469,6 +2493,7 @@ function ProductDetailPage({
                         <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
                     </div>
                     <ProductTypeBadge product={product} />
+                    <ProductFulfillmentNote product={product} />
                     {product.description && (
                         <div className="product-description-section">
                             <h2>{messages.description}</h2>
@@ -2674,6 +2699,7 @@ function CheckoutPaymentForm({
                                     <strong>{product.name}</strong>
                                     <ProductTypeBadge product={product} />
                                     <span>{quantity} x {amount(product.priceAmount, product.priceCurrency)}</span>
+                                    <ProductFulfillmentNote product={product} compact />
                                 </div>
                                 <b>{amount(number(product.priceAmount) * number(quantity), product.priceCurrency)}</b>
                             </div>
@@ -3556,6 +3582,7 @@ function ProductDialog({ product, quantity, onClose, onOpenGallery, onIncrement,
                 <h2>{product.name}</h2>
                 <ProductTypeBadge product={product} />
                 <p>{product.description || messages.noDescription}</p>
+                <ProductFulfillmentNote product={product} />
                 <div className="product-meta">
                     <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
                     <span>{inventoryLabel(product, messages)}</span>
