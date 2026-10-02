@@ -1233,6 +1233,42 @@ button:disabled {
     padding-top: 16px;
 }
 
+.fulfillment-note {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid rgba(79, 128, 92, 0.16);
+    border-radius: 8px;
+    padding: 10px;
+    background: #f8fcfa;
+}
+
+.fulfillment-note strong {
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 950;
+}
+
+.fulfillment-note span {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.4;
+    font-weight: 700;
+}
+
+.fulfillment-note--compact {
+    margin-top: 7px;
+    padding: 8px;
+}
+
+.fulfillment-note--compact strong {
+    font-size: 12px;
+}
+
+.fulfillment-note--compact span {
+    font-size: 12px;
+}
+
 .product-description-section h2 {
     margin: 0;
     color: #0f172a;
