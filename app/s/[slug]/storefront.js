@@ -2,27 +2,19 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
+import COUNTRY_DATA from '../../../src/data/countries';
 
 const PAGE_SIZE = 20;
 const BUYER_DETAILS_STORAGE_KEY = 'fondeka-commerce-buyer-details';
 const MOBILE_BROWSER_RE = /Android|iPhone|iPad|iPod/i;
-const COUNTRY_OPTIONS = [
-    { code: 'CD', name: 'Congo', callingCode: '243', flag: '🇨🇩' },
-    { code: 'CG', name: 'Congo (Brazza)', callingCode: '242', flag: '🇨🇬' },
-    { code: 'CM', name: 'Cameroon', callingCode: '237', flag: '🇨🇲' },
-    { code: 'RW', name: 'Rwanda', callingCode: '250', flag: '🇷🇼' },
-    { code: 'BI', name: 'Burundi', callingCode: '257', flag: '🇧🇮' },
-    { code: 'KE', name: 'Kenya', callingCode: '254', flag: '🇰🇪' },
-    { code: 'TZ', name: 'Tanzania', callingCode: '255', flag: '🇹🇿' },
-    { code: 'UG', name: 'Uganda', callingCode: '256', flag: '🇺🇬' },
-    { code: 'ZM', name: 'Zambia', callingCode: '260', flag: '🇿🇲' },
-    { code: 'ZW', name: 'Zimbabwe', callingCode: '263', flag: '🇿🇼' },
-    { code: 'GA', name: 'Gabon', callingCode: '241', flag: '🇬🇦' },
-    { code: 'AO', name: 'Angola', callingCode: '244', flag: '🇦🇴' },
-    { code: 'FR', name: 'France', callingCode: '33', flag: '🇫🇷' },
-    { code: 'LU', name: 'Luxembourg', callingCode: '352', flag: '🇱🇺' },
-    { code: 'US', name: 'United States', callingCode: '1', flag: '🇺🇸' },
-];
+const COUNTRY_OPTIONS = COUNTRY_DATA
+    .filter((country) => country.callingCode)
+    .map((country) => ({
+        code: country.cca2,
+        name: country.name,
+        callingCode: country.callingCode,
+        flag: country.flag,
+    }));
 const COUNTRIES_BY_CODE = COUNTRY_OPTIONS.reduce((acc, country) => {
     acc[country.code] = country;
     return acc;
