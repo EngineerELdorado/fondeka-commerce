@@ -3574,6 +3574,36 @@ button:disabled {
     background: #f8fafc;
 }
 
+.video-action-bar {
+    width: 100%;
+    padding: 10px 0 0;
+    background: #fff;
+}
+
+.video-details-button {
+    width: 100%;
+    min-height: 50px;
+    border: 0;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--brand);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.video-details-button:hover {
+    background: var(--brand-dark);
+}
+
+.video-details-button:focus-visible {
+    outline: 3px solid rgba(79, 128, 92, 0.4);
+    outline-offset: 3px;
+}
+
 .video-loading-overlay {
     position: absolute;
     inset: 0;

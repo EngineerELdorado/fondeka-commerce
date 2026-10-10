@@ -225,6 +225,7 @@ const COMMERCE_MESSAGES = {
         securePayments: 'Secure payments',
         support: 'Support',
         playVideo: 'Play video',
+        details: 'Details',
     },
     fr: {
         paymentTypeLabels: {
@@ -411,6 +412,7 @@ const COMMERCE_MESSAGES = {
         webPaymentPending: 'Terminez le paiement pour continuer. Cette page se mettra à jour automatiquement.',
         merchant: 'Marchand Fondeka',
         playVideo: 'Lire la vidéo',
+        details: 'Détails',
         delivery: 'Livraison',
         securePayments: 'Paiements sécurisés',
         support: 'Support',
@@ -1845,6 +1847,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 onProductVideo={(product) => setActiveVideo({
                     url: product.videoUrl,
                     poster: product.videoThumbnailUrl || productImages(product)[0] || '',
+                    onAction: () => {
+                        setActiveVideo(null);
+                        const targetSlug = product.slug || product.id;
+                        if (targetSlug && store?.slug) window.location.href = `/stores/${encodeURIComponent(store.slug)}/products/${encodeURIComponent(targetSlug)}`;
+                        else setSelectedProduct(product);
+                    },
                 })}
                 onStoreVideo={() => setActiveVideo({
                     url: store.videoUrl,
@@ -3568,6 +3576,13 @@ function VideoViewer({ video, onClose }) {
                         </div>
                     )}
                 </div>
+                {typeof video.onAction === 'function' ? (
+                    <div className="video-action-bar">
+                        <button type="button" className="video-details-button" onClick={video.onAction}>
+                            {messages.details}
+                        </button>
+                    </div>
+                ) : null}
             </section>
         </div>
     );
