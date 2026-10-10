@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 import COUNTRY_DATA from '../../../src/data/countries';
 
@@ -224,6 +224,7 @@ const COMMERCE_MESSAGES = {
         delivery: 'Delivery',
         securePayments: 'Secure payments',
         support: 'Support',
+        playVideo: 'Play video',
     },
     fr: {
         paymentTypeLabels: {
@@ -409,6 +410,7 @@ const COMMERCE_MESSAGES = {
         provider: 'Fournisseur {provider}.',
         webPaymentPending: 'Terminez le paiement pour continuer. Cette page se mettra à jour automatiquement.',
         merchant: 'Marchand Fondeka',
+        playVideo: 'Lire la vidéo',
         delivery: 'Livraison',
         securePayments: 'Paiements sécurisés',
         support: 'Support',
@@ -987,6 +989,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [currencies, setCurrencies] = useState({ billingCurrency: seededCurrency, paymentCurrency: seededCurrency });
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [imageGallery, setImageGallery] = useState(null);
+    const [activeVideo, setActiveVideo] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [activeTab, setActiveTab] = useState('PRODUCTS');
     const [checkoutSheetOpen, setCheckoutSheetOpen] = useState(false);
@@ -1758,6 +1761,10 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     onOpenGallery={(startIndex = 0) => setImageGallery({ product: directProduct, index: startIndex })}
                     onQuantityChange={(nextQuantity) => setQuantity(directProduct.id, Math.max(1, nextQuantity))}
                     onPay={() => setCheckoutSheetOpen(true)}
+                    onPlayVideo={() => setActiveVideo({
+                        url: directProduct.videoUrl,
+                        poster: directProduct.videoThumbnailUrl || productImages(directProduct)[0] || '',
+                    })}
                 />
                 <CheckoutSheet
                     open={checkoutSheetOpen}
@@ -1810,6 +1817,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         onClose={() => setImageGallery(null)}
                     />
                 )}
+                {activeVideo && <VideoViewer video={activeVideo} onClose={() => setActiveVideo(null)} />}
             </Screen>
         );
     }
@@ -1834,6 +1842,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 }}
                 onProductAdd={(product) => changeQuantity(product.id, 1)}
                 onProductRemove={(product) => changeQuantity(product.id, -1)}
+                onProductVideo={(product) => setActiveVideo({
+                    url: product.videoUrl,
+                    poster: product.videoThumbnailUrl || productImages(product)[0] || '',
+                })}
+                onStoreVideo={() => setActiveVideo({
+                    url: store.videoUrl,
+                    poster: store.videoThumbnailUrl || store.bannerUrl || '',
+                })}
                 onPay={() => setCheckoutSheetOpen(true)}
             />
             <CheckoutSheet
@@ -1894,6 +1910,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     onClose={() => setImageGallery(null)}
                 />
             )}
+            {activeVideo && <VideoViewer video={activeVideo} onClose={() => setActiveVideo(null)} />}
             {countryPicker}
             {reviewSheet}
             {paymentPromptModal}
@@ -2043,6 +2060,8 @@ function StoreProfilePage({
     onProductOpen,
     onProductAdd,
     onProductRemove,
+    onProductVideo,
+    onStoreVideo,
     onPay,
 }) {
     const messages = useCommerceMessages();
@@ -2056,6 +2075,7 @@ function StoreProfilePage({
                             product={product}
                             quantity={number(cart[product.id])}
                             onOpen={() => onProductOpen(product)}
+                            onPlayVideo={() => onProductVideo(product)}
                             onAdd={() => onProductAdd(product)}
                             onRemove={() => onProductRemove(product)}
                         />
@@ -2072,7 +2092,7 @@ function StoreProfilePage({
     return (
         <div className={`store-profile${cartCount ? ' store-profile--with-cart' : ''}`}>
             <ProfileTopBar title="Fondeka Commerce" />
-            <StoreProfileHeader store={store} />
+            <StoreProfileHeader store={store} onPlayVideo={onStoreVideo} />
             <StoreTabs activeTab={activeTab} onChange={onTabChange} />
             <section className="store-tab-panel" aria-label={messages.storeTabs[activeTab]}>
                 {tabs[activeTab]}
@@ -2088,7 +2108,7 @@ function StoreProfilePage({
     );
 }
 
-function StoreProfileHeader({ store }) {
+function StoreProfileHeader({ store, onPlayVideo }) {
     const messages = useCommerceMessages();
     const verified = isVerifiedStatus(store?.verificationStatus);
     const memberSince = formatMemberSince(store?.createdAt);
@@ -2098,6 +2118,7 @@ function StoreProfileHeader({ store }) {
         <section className="store-profile-header">
             <div className="store-cover">
                 {store?.bannerUrl ? <img src={store.bannerUrl} alt="" /> : null}
+                {store?.videoUrl && <VideoPlayButton onClick={onPlayVideo} label={messages.playVideo} className="store-cover-play-button" />}
                 <div className="store-avatar">
                     {store?.logoUrl ? <img src={store.logoUrl} alt="" /> : <span>{String(store?.name || 'S').slice(0, 1).toUpperCase()}</span>}
                 </div>
@@ -2350,21 +2371,24 @@ function StoreReviews({ reviews, storeName }) {
     );
 }
 
-function ProfileProductCard({ product, quantity, onOpen, onAdd, onRemove }) {
+function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onRemove }) {
     const messages = useCommerceMessages();
     const out = inventoryLabel(product, messages) === messages.outOfStock;
     const images = productImages(product);
     const image = images[0];
     return (
         <article className="profile-product-card">
-            <button
-                type="button"
-                className="profile-product-media"
-                onClick={onOpen}
-                aria-label={interpolate(messages.viewProduct, { name: product.name || product.slug || messages.product })}
-            >
-                {image ? <img src={image} alt="" /> : initials(product.name)}
-            </button>
+            <div className="profile-product-media-wrap">
+                <button
+                    type="button"
+                    className="profile-product-media"
+                    onClick={onOpen}
+                    aria-label={interpolate(messages.viewProduct, { name: product.name || product.slug || messages.product })}
+                >
+                    {image ? <img src={image} alt="" /> : initials(product.name)}
+                </button>
+                {product.videoUrl && <VideoPlayButton onClick={onPlayVideo} label={messages.playVideo} />}
+            </div>
             <div className="profile-product-body">
                 <button type="button" className="profile-product-name" onClick={onOpen}>{product.name || product.slug || messages.product}</button>
                 <ProductTypeBadge product={product} />
@@ -2419,6 +2443,7 @@ function ProductDetailPage({
     onOpenGallery,
     onQuantityChange,
     onPay,
+    onPlayVideo,
 }) {
     const messages = useCommerceMessages();
     const images = productImages(product);
@@ -2445,6 +2470,7 @@ function ProductDetailPage({
                         >
                             {activeImage ? <img src={activeImage} alt={product.name || ''} /> : <span>{initials(product.name)}</span>}
                         </button>
+                        {product.videoUrl && <VideoPlayButton onClick={onPlayVideo} label={messages.playVideo} />}
                         {storeName && (
                             <a className="media-store-pill" href={storeHref}>
                                 <span>{store?.logoUrl ? <img src={store.logoUrl} alt="" /> : initials(storeName).slice(0, 1)}</span>
@@ -3475,6 +3501,74 @@ function FxDetails({ fx }) {
                 target: amount(fx.targetAmount, fx.targetCurrency),
             })}
             {fx.provider && <span> {interpolate(messages.provider, { provider: fx.provider })}</span>}
+        </div>
+    );
+}
+
+function VideoPlayButton({ onClick, label, className = '' }) {
+    return (
+        <button type="button" className={`video-play-button${className ? ` ${className}` : ''}`} onClick={onClick} aria-label={label}>
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M8 5.2v13.6L19 12 8 5.2z" fill="currentColor" />
+            </svg>
+        </button>
+    );
+}
+
+function VideoViewer({ video, onClose }) {
+    const messages = useCommerceMessages();
+    const videoRef = useRef(null);
+    const closeRef = useRef(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fallback = window.setTimeout(() => setLoading(false), 4500);
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        closeRef.current?.focus();
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+
+        const player = videoRef.current;
+        return () => {
+            window.clearTimeout(fallback);
+            window.removeEventListener('keydown', handleKeyDown);
+            document.body.style.overflow = previousOverflow;
+            player?.pause();
+        };
+    }, [onClose, video.url]);
+
+    return (
+        <div className="video-viewer-backdrop" role="dialog" aria-modal="true" aria-label={messages.playVideo} onClick={onClose}>
+            <section className="video-viewer" onClick={(event) => event.stopPropagation()}>
+                <div className="video-viewer-header">
+                    <button ref={closeRef} type="button" className="video-close-button" onClick={onClose} aria-label={messages.close}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="video-frame">
+                    <video
+                        ref={videoRef}
+                        src={video.url}
+                        poster={video.poster || undefined}
+                        controls
+                        autoPlay
+                        playsInline
+                        onCanPlay={() => setLoading(false)}
+                        onPlaying={() => setLoading(false)}
+                    />
+                    {loading && (
+                        <div className="video-loading-overlay" aria-live="polite" aria-label={messages.loading}>
+                            <span className="video-loading-pill"><i /></span>
+                        </div>
+                    )}
+                </div>
+            </section>
         </div>
     );
 }
