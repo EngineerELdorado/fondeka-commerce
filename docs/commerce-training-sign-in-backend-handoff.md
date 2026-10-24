@@ -2,6 +2,8 @@
 
 Status: backend implementation handoff. Updated 2026-10-24. The APIs below are proposals, not endpoints implemented by this document. Audit and reuse equivalent existing functionality before introducing new routes.
 
+Update 2026-10-25: this file records the original design proposal. Backend source now includes a recovery controller with flow/session cookies and CSRF handling. Use the reviewed contract in [the public learner UI handoff](public-training-learner-ui-handoff.md), confirm deployment/configuration, and reuse that implementation instead of introducing duplicate recovery APIs. Buyer learning is on public Commerce; the Business portal retains authoring only.
+
 ## Product boundary
 
 **Commerce is a public storefront. It has no account sign-in or registration journey.** Buyers browse, purchase and learn here. Recovering a purchase on another device must not require a Fondeka account, an app installation, customer JWT, financial-account device approval or a redirect to `web.fondeka.com`.
