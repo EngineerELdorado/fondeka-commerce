@@ -303,12 +303,12 @@
 .commerce-ui .payment-provider-copy { min-width: 0; width: 100%; }
 .commerce-ui .payment-provider-copy strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; color: var(--ink); font-size: 12px; line-height: 1.35; font-weight: 550; white-space: normal; text-align: center; }
 /* Keep Expo's currency families with warmer, muted tones, including when selected. */
-.commerce-ui .payment-provider-currency { --currency-background: #f2f0eb; --currency-foreground: #6d675d; --currency-border: #e2ddd3; position: absolute; top: 8px; left: 8px; max-width: calc(100% - 38px); overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--currency-border); border-radius: 6px; padding: 2px 5px; background: var(--currency-background); color: var(--currency-foreground); font-size: 10px; line-height: 1.2; font-weight: 650; white-space: nowrap; }
-.commerce-ui .payment-provider-currency[data-currency="USD"] { --currency-background: #edf2ea; --currency-foreground: #49644e; --currency-border: #d7e2d2; }
-.commerce-ui .payment-provider-currency[data-currency="CDF"] { --currency-background: #edf1f5; --currency-foreground: #51677f; --currency-border: #d7dfe8; }
-.commerce-ui .payment-provider-currency[data-currency="EUR"] { --currency-background: #f1edf5; --currency-foreground: #6e5b7c; --currency-border: #e1d8e8; }
-.commerce-ui .payment-provider-currency[data-currency="KES"] { --currency-background: #f7f0e3; --currency-foreground: #836a3d; --currency-border: #e9dcc1; }
-.commerce-ui .payment-provider-currency[data-currency="GHS"] { --currency-background: #f6ecee; --currency-foreground: #8a5f6b; --currency-border: #e9d7dd; }
+.commerce-ui .payment-provider-currency { --currency-background: #eeebe4; --currency-foreground: #665f52; --currency-border: #d7cebf; position: absolute; top: 8px; left: 8px; max-width: calc(100% - 38px); overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--currency-border); border-radius: 6px; padding: 2px 5px; background: var(--currency-background); color: var(--currency-foreground); font-size: 10px; line-height: 1.2; font-weight: 650; white-space: nowrap; }
+.commerce-ui .payment-provider-currency[data-currency="USD"] { --currency-background: #e2eddd; --currency-foreground: #3e6047; --currency-border: #b8cdb0; }
+.commerce-ui .payment-provider-currency[data-currency="CDF"] { --currency-background: #e1eaf4; --currency-foreground: #435f81; --currency-border: #b7c9de; }
+.commerce-ui .payment-provider-currency[data-currency="EUR"] { --currency-background: #ebe1f2; --currency-foreground: #6b4f7d; --currency-border: #cdb9dc; }
+.commerce-ui .payment-provider-currency[data-currency="KES"] { --currency-background: #f3e7ce; --currency-foreground: #7c6030; --currency-border: #dec79b; }
+.commerce-ui .payment-provider-currency[data-currency="GHS"] { --currency-background: #f2e0e5; --currency-foreground: #855461; --currency-border: #dbb9c4; }
 .commerce-ui .payment-method-tile input[type="radio"] { position: absolute; top: 9px; right: 9px; appearance: auto; width: 16px; height: 16px; min-height: 16px; margin: 0; accent-color: var(--brand); padding: 0; box-shadow: none; cursor: inherit; }
 .commerce-ui .mobile-money-phone-panel { margin-top: 16px; border: 0; background: var(--surface-raised); border-radius: 12px; padding: 12px; }
 .commerce-ui .mobile-money-phone-label { color: var(--secondary); font-size: 12px; font-weight: 500; }
