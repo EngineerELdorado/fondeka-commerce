@@ -1,0 +1,23 @@
+# Commerce training storefront
+
+TRAINING products use the normal public product, checkout, payment-method and order polling APIs. The public syllabus displays module and material titles/types in response order. Checkout normalizes training quantity to one and rejects duplicate training lines. Training carts stay on web checkout on mobile.
+
+For public email verification and guest purchase recovery, see [the backend recovery handoff](commerce-training-sign-in-backend-handoff.md). Commerce has no account sign-in, registration or account-claim journey. The document identifies existing components and proposes the missing guest recovery contract; those proposed endpoints are not implemented in this storefront.
+
+The success action uses the exact `trainingPlayerUrl` from an eligible paid order item. The backend already serves the responsive player, learner notes, manual completion, backend-driven progress and Continue learning, plus fresh authorized FILE/LINK access. The storefront does not construct a player or material URL, infer ownership from email, probe alternate identifiers, or substitute a public asset/CDN URL. The optional customer library belongs in the authenticated portal; this public storefront has no customer JWT/session integration.
+
+The backend learner player presents recognized YouTube LINK materials as video cards with a local play graphic and localized watch action. Learner metadata can include `linkProvider: "YOUTUBE"` while the source URL remains redacted. The public syllabus still contains only its existing titles/types. Card clicks use the existing protected material-open route for fresh access validation; they do not mark a lesson complete. No YouTube scripts, iframes or remote thumbnails load on the guest page. Other LINK and FILE actions retain their existing behavior. Backend changes require the normal backend rebuild/redeploy before appearing in a running player.
+
+Player links remain only in active React state and anchor elements. Do not add them to storage, analytics, logs, error breadcrumbs, support transcripts or metadata. The player is a plain browser navigation with no referrer or prefetch. Keep guest player pages free of third-party scripts and trackers. A payment provider response alone never enables access; polling continues until eligible payment and a player URL for each training item.
+
+The backend player owns token-scoped lesson/progress requests and their error UI. Preserve the order reference, item ID and access token as one scope. Guest flows retain their token scope; expired public learner sessions restart purchase-email verification on Commerce, without account sign-in or registration. Account-only authentication remains a separate portal concern. A 403 TRAINING_ACCESS_REQUIRED returns to payment status, 404 NO_RESULT shows unavailable content without alternate-ID requests, and 503 INVALID_REQUEST offers Retry for a temporary file/storage failure. Refunds revoke future access while server curriculum/progress remains. Downloads and external links already obtained cannot be recalled.
+
+## Deployment
+
+Apply [the private-file storage instructions](commerce-training-storage.md) before releasing FILE materials. The storefront cannot change or verify the bucket/CDN policy.
+
+Use [the Nginx log format](../deploy/nginx/commerce-private-logging.conf) in the reverse proxy's `http` context and replace access logs in all storefront, API and player server/location blocks with `commerce_private`. It omits query strings and referrers, redacting `accessToken` by omission. The snippet includes the token-route error-log rule because Nginx error logs can also contain request URLs. Retain the deployment's existing proxy routing; do not create a new public file route. Apply equivalent redaction to any load balancer, CDN, WAF, application request logger or error collector in front of the backend. This repository contains no live proxy configuration; the snippet must be integrated by the deployment owner.
+
+Validate the final proxy configuration with `nginx -t` before reloading it. Send a request containing a synthetic `accessToken` and verify neither the query nor referrer appears in access/error logs, including upstream-error paths. Verify guest player responses retain `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and no third-party scripts. Never use a real learner URL for diagnostics.
+
+Run `npm test` and `npm run build`. Browser regression coverage should include both public product routes, ordered syllabus and retry, hidden quantity controls, mobile web checkout, pending payment, paid with null links followed by a player URL, and stale links on refunded/disputed orders.

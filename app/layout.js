@@ -1,4 +1,5 @@
 import './globals.css';
+import './commerce-ui.css';
 
 export const metadata = {
     metadataBase: new URL('https://commerce.fondeka.com'),
@@ -57,6 +58,7 @@ export const viewport = {
     width: 'device-width',
     initialScale: 1,
     viewportFit: 'cover',
+    colorScheme: 'light',
 };
 
 export default function RootLayout({ children }) {

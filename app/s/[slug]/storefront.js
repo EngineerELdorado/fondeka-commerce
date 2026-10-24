@@ -1,7 +1,14 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
+import {
+    checkoutLineItems, isEligiblePaidOrder, isTraining, productQuantity,
+    shouldPollOrder, storefrontCartItems, trainingOutlinePath, trainingPlayerUrl,
+} from '../../../lib/commerce-training.mjs';
+import TrainingSyllabus from '../../training-syllabus';
+import { CommerceIcon, CommerceImage, DialogBackdrop, DropdownChevron, SocialIcon, StepProgress, StorefrontSkeleton, useCheckoutNavigation } from '../../commerce-ui';
+import { COMMERCE_UI_COPY } from '../../../lib/commerce-ui-copy';
 import COUNTRY_DATA from '../../../src/data/countries';
 
 const PAGE_SIZE = 20;
@@ -175,7 +182,21 @@ const COMMERCE_MESSAGES = {
         available: 'Available',
         outOfStock: 'Out of stock',
         availableQuantity: '{quantity} available',
-        productTypeLabels: { PHYSICAL: 'Physical', DIGITAL: 'Digital', SERVICE: 'Service' },
+        productTypeLabels: { PHYSICAL: 'Physical', DIGITAL: 'Digital', SERVICE: 'Service', TRAINING: 'Training' },
+        trainingPurchase: 'Complete training access',
+        trainingPurchaseHelp: 'One payment unlocks the complete published curriculum, including material published later.',
+        trainingCurriculum: 'Training curriculum',
+        trainingMaterialTypes: { FILE: 'File', LINK: 'Link' },
+        loadingCurriculum: 'Loading curriculum…',
+        curriculumUnavailable: 'This curriculum is unavailable.',
+        curriculumError: 'The curriculum is temporarily unavailable. Please retry.',
+        curriculumEmpty: 'No material has been published yet.',
+        trainingInCart: 'Training added',
+        removeTraining: 'Remove training',
+        startTraining: 'Start training',
+        trainingAccessPending: 'Your training access is being prepared. This page will update automatically.',
+        trainingAccessError: 'Unable to refresh access. Please retry.',
+        trainingAccessInactive: 'Training access is not active. Review your order and payment status.',
         digitalDelivery: 'Digital delivery',
         digitalDeliveryHelp: 'Access is provided after payment. No shipping is needed.',
         servicePurchase: 'Service booking',
@@ -365,7 +386,21 @@ const COMMERCE_MESSAGES = {
         available: 'Disponible',
         outOfStock: 'Rupture de stock',
         availableQuantity: '{quantity} disponible(s)',
-        productTypeLabels: { PHYSICAL: 'Physique', DIGITAL: 'Digital', SERVICE: 'Service' },
+        productTypeLabels: { PHYSICAL: 'Physique', DIGITAL: 'Digital', SERVICE: 'Service', TRAINING: 'Formation' },
+        trainingPurchase: 'Accès à la formation complète',
+        trainingPurchaseHelp: 'Un seul paiement débloque tout le programme publié, y compris les contenus publiés plus tard.',
+        trainingCurriculum: 'Programme de la formation',
+        trainingMaterialTypes: { FILE: 'Fichier', LINK: 'Lien' },
+        loadingCurriculum: 'Chargement du programme…',
+        curriculumUnavailable: 'Ce programme est indisponible.',
+        curriculumError: 'Le programme est temporairement indisponible. Veuillez réessayer.',
+        curriculumEmpty: 'Aucun contenu n’a encore été publié.',
+        trainingInCart: 'Formation ajoutée',
+        removeTraining: 'Retirer la formation',
+        startTraining: 'Commencer la formation',
+        trainingAccessPending: 'Votre accès à la formation est en cours de préparation. Cette page se mettra à jour automatiquement.',
+        trainingAccessError: 'Impossible d’actualiser l’accès. Veuillez réessayer.',
+        trainingAccessInactive: 'L’accès à la formation n’est pas actif. Vérifiez l’état de votre commande et de votre paiement.',
         digitalDelivery: 'Livraison digitale',
         digitalDeliveryHelp: 'L’accès est fourni après paiement. Aucune livraison physique n’est nécessaire.',
         servicePurchase: 'Service / réservation',
@@ -418,7 +453,7 @@ const COMMERCE_MESSAGES = {
         support: 'Support',
     },
 };
-const CommerceMessagesContext = React.createContext(COMMERCE_MESSAGES.en);
+const CommerceMessagesContext = React.createContext({ ...COMMERCE_MESSAGES.en, ...COMMERCE_UI_COPY.en });
 
 function normalizeCommerceLanguage(value) {
     const language = String(value || '').trim().toLowerCase().split(/[-_]/)[0];
@@ -585,14 +620,14 @@ function storeContactLinks(store) {
 
 function storeSocialLinks(store) {
     return [
-        ['instagramUrl', 'Instagram', 'IG'],
-        ['facebookUrl', 'Facebook', 'f'],
-        ['tiktokUrl', 'TikTok', '♪'],
-        ['youtubeUrl', 'YouTube', '▶'],
-        ['twitterUrl', 'X', 'X'],
-        ['linkedinUrl', 'LinkedIn', 'in'],
+        ['instagramUrl', 'Instagram', 'instagram'],
+        ['facebookUrl', 'Facebook', 'facebook'],
+        ['tiktokUrl', 'TikTok', 'tiktok'],
+        ['youtubeUrl', 'YouTube', 'youtube'],
+        ['twitterUrl', 'X', 'x'],
+        ['linkedinUrl', 'LinkedIn', 'linkedin'],
     ]
-        .map(([field, label, icon]) => ({ key: field, label, icon, href: store?.[field] }))
+        .map(([field, label, platform]) => ({ key: field, label, platform, href: store?.[field] }))
         .filter((link) => link.href);
 }
 
@@ -643,17 +678,7 @@ function isNotFound(error) {
 }
 
 function isOrderPaid(order) {
-    const orderStatus = String(order?.status || '').toUpperCase();
-    const paymentStatus = String(order?.paymentTransactionStatus || '').toUpperCase();
-    return orderStatus === 'PAID' || paymentStatus === 'COMPLETED' || paymentStatus === 'PAID';
-}
-
-function isOrderTerminal(order) {
-    const orderStatus = String(order?.status || '').toUpperCase();
-    const paymentStatus = String(order?.paymentTransactionStatus || '').toUpperCase();
-    return isOrderPaid(order) ||
-        ['FAILED', 'CANCELED', 'CANCELLED'].includes(orderStatus) ||
-        ['FAILED', 'CANCELED', 'CANCELLED'].includes(paymentStatus);
+    return isEligiblePaidOrder(order);
 }
 
 function initials(text) {
@@ -803,7 +828,7 @@ function productImages(product) {
 
 function productType(product) {
     const value = String(product?.productType || product?.type || 'PHYSICAL').trim().toUpperCase();
-    return ['PHYSICAL', 'DIGITAL', 'SERVICE'].includes(value) ? value : 'PHYSICAL';
+    return ['PHYSICAL', 'DIGITAL', 'SERVICE', 'TRAINING'].includes(value) ? value : 'PHYSICAL';
 }
 
 function productFulfillment(product) {
@@ -818,13 +843,14 @@ function orderFulfillmentItems(order) {
 
     return orderItems
         .map((item) => ({
-            key: item.id || item.productId || item.productSlug || item.productName,
+            key: item.orderItemId ?? item.id ?? item.productId ?? item.productSlug ?? item.productName,
             name: item.productName || item.name || '',
             quantity: item.quantity,
             type: productType({ productType: item.productType }),
-            instructions: String(item.fulfillmentInstructions || '').trim(),
-            downloadUrl: String(item.downloadUrl || '').trim(),
-            fulfillmentUrl: String(item.fulfillmentUrl || '').trim(),
+            instructions: isTraining(item) ? '' : String(item.fulfillmentInstructions || '').trim(),
+            downloadUrl: isTraining(item) ? '' : String(item.downloadUrl || '').trim(),
+            fulfillmentUrl: isTraining(item) ? '' : String(item.fulfillmentUrl || '').trim(),
+            trainingPlayerUrl: trainingPlayerUrl(order, item),
         }))
         .filter((item) => item.name);
 }
@@ -843,12 +869,9 @@ function getFondekaCommerceSchemeBase() {
 }
 
 function commerceAppCheckoutDeepLink(cartItems, currencies) {
-    const items = cartItems
-        .filter(({ product, quantity }) => product?.id && number(quantity) > 0)
-        .map(({ product, quantity }) => ({
-            productId: product.id,
-            quantity: Math.max(1, Math.floor(number(quantity))),
-        }));
+    // Training checkout stays on the public site when opened from mobile.
+    if (cartItems.some(({ product }) => isTraining(product))) return '';
+    const items = checkoutLineItems(cartItems.filter(({ product, quantity }) => product?.id && number(quantity) > 0));
 
     if (!items.length) return '';
 
@@ -880,10 +903,7 @@ function checkoutPayload(cartItems, buyer, currencies) {
     const paymentCurrency = cartCurrency || currencies.paymentCurrency || billingCurrency;
 
     return {
-        items: cartItems.map(({ product, quantity }) => ({
-            productId: product.id,
-            quantity,
-        })),
+        items: checkoutLineItems(cartItems),
         billingCurrency: billingCurrency.trim().toUpperCase(),
         paymentCurrency: paymentCurrency.trim().toUpperCase(),
         channel: 'STOREFRONT',
@@ -1012,6 +1032,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [cryptoNetworks, setCryptoNetworks] = useState([]);
     const [cryptoNetworksLoading, setCryptoNetworksLoading] = useState(false);
     const [cryptoNetworksError, setCryptoNetworksError] = useState(null);
+    const [networkAttempt, setNetworkAttempt] = useState(0);
     const [selectedCryptoNetworkId, setSelectedCryptoNetworkId] = useState(null);
     const [isMobileBrowser, setIsMobileBrowser] = useState(false);
     const [showAppInstallFallback, setShowAppInstallFallback] = useState(false);
@@ -1023,7 +1044,10 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [busy, setBusy] = useState(false);
     const [loadError, setLoadError] = useState(initialLoadError);
     const [flowError, setFlowError] = useState(null);
-    const messages = useMemo(() => COMMERCE_MESSAGES[normalizeCommerceLanguage(language)] || COMMERCE_MESSAGES.en, [language]);
+    const messages = useMemo(() => ({ ...COMMERCE_MESSAGES[normalizeCommerceLanguage(language)], ...COMMERCE_UI_COPY[normalizeCommerceLanguage(language)] }), [language]);
+    const checkoutNavigation = useCheckoutNavigation({ setOpen: setCheckoutSheetOpen, setReviewOpen: setPaymentReviewOpen, canReview: Boolean(paymentReviewContext?.quote || quote), busy });
+    const paymentSubmissionLock = useRef(false);
+    const quoteSubmissionLock = useRef(false);
     const withMessages = (node) => (
         <CommerceMessagesContext.Provider value={messages}>
             {node}
@@ -1122,9 +1146,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         };
     }, [store?.slug, slug]);
 
-    const cartItems = useMemo(() => products
-        .map((product) => ({ product, quantity: number(cart[product.id]) }))
-        .filter((item) => item.quantity > 0), [cart, products]);
+    const cartItems = useMemo(() => storefrontCartItems(products, cart), [cart, products]);
+    const expectedTrainingIds = useMemo(() => cartItems.filter(({ product }) => isTraining(product)).map(({ product }) => product.id), [cartItems]);
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const cartTotalLabel = formatCartTotals(cartItems);
@@ -1148,7 +1171,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }, [appCheckoutLink]);
 
     const setQuantity = (productId, nextQuantity) => {
-        const safeQuantity = Math.max(0, Math.floor(number(nextQuantity)));
+        const product = products.find((candidate) => String(candidate.id) === String(productId));
+        const safeQuantity = productQuantity(product, nextQuantity);
+        if (safeQuantity === number(cart[productId])) return;
         setCart((current) => {
             const next = { ...current };
             if (safeQuantity > 0) next[productId] = safeQuantity;
@@ -1275,6 +1300,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         }
 	    }, [countryCode, messages.unableToLoadPaymentMethods]);
 
+    const retryPaymentMethods = () => {
+        const product = cartItems[0]?.product || products.find((candidate) => candidate?.priceCurrency);
+        fetchPaymentMethodsForAmount({ amount: number(product?.priceAmount), currency: product?.priceCurrency || currencies.paymentCurrency || currencies.billingCurrency }).catch(() => {});
+    };
+
     const fetchPaymentMethods = useCallback(async (currentOrder) => fetchPaymentMethodsForAmount({
         amount: currentOrder.paymentAmount ?? currentOrder.billingAmount ?? 0,
         currency: currentOrder.paymentCurrency || currentOrder.billingCurrency || '',
@@ -1310,21 +1340,24 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     };
 
     const reviewPayment = async () => {
+        if (quoteSubmissionLock.current) return;
         const validation = validate();
         if (validation) {
             setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
             return;
         }
 
+        quoteSubmissionLock.current = true;
         setBusy(true);
         setFlowError(null);
         try {
             const quoteResult = await fetchPaymentQuote();
             setPaymentReviewContext(quoteResult);
-            setPaymentReviewOpen(true);
+            checkoutNavigation.review();
         } catch (error) {
             setFlowError(readError(error, messages.unableToCheckFees));
         } finally {
+            quoteSubmissionLock.current = false;
             setBusy(false);
         }
     };
@@ -1369,12 +1402,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     };
 
     const confirmPayment = async () => {
+        if (paymentSubmissionLock.current) return;
         const validation = validate();
         if (validation) {
             setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
             return;
         }
 
+        paymentSubmissionLock.current = true;
         setBusy(true);
         setFlowError(null);
         try {
@@ -1409,13 +1444,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     }),
                 }
             );
-            setPaymentReviewOpen(false);
+            checkoutNavigation.finishReview();
             setPaymentReviewContext(null);
             showPaymentPrompt(paidOrder, methodForPayment, paymentQuote);
             setOrder(paidOrder);
         } catch (error) {
             setFlowError(readError(error, messages.unableToStartPayment));
         } finally {
+            paymentSubmissionLock.current = false;
             setBusy(false);
         }
     };
@@ -1464,7 +1500,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         return () => {
             cancelled = true;
         };
-    }, [messages.unableToLoadCryptoNetworks, selectedPaymentMethod?.id, selectedPaymentMethod?.type]);
+    }, [messages.unableToLoadCryptoNetworks, selectedPaymentMethod?.id, selectedPaymentMethod?.type, networkAttempt]);
 
     useEffect(() => {
         const fallbackProduct = cartItems[0]?.product || products.find((product) => product?.priceCurrency);
@@ -1497,8 +1533,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }, [cartItems, products, currencies.billingCurrency, currencies.paymentCurrency, fetchPaymentMethodsForAmount]);
 
     useEffect(() => {
-        if (!order?.reference || !order?.accessToken) return undefined;
-        if (isOrderTerminal(order)) return undefined;
+        if (!shouldPollOrder(order, expectedTrainingIds)) return undefined;
 
         let cancelled = false;
         const poll = async () => {
@@ -1517,16 +1552,25 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             cancelled = true;
             window.clearInterval(timer);
         };
-    }, [order?.accessToken, order?.paymentTransactionStatus, order?.reference, order?.status]);
+    }, [order, expectedTrainingIds]);
 
     useEffect(() => {
-        if (!isOrderPaid(order)) return;
+        if (!isOrderPaid(order)) {
+            setPaymentPrompt((current) => current?.type === 'PAID' ? null : current);
+            setReceiptOpen(false);
+            if (order && expectedTrainingIds.length && !shouldPollOrder(order, expectedTrainingIds)) {
+                setCheckoutSheetOpen(false);
+                setShowOrderPaymentView(true);
+            }
+            return;
+        }
         const fulfillmentItems = orderFulfillmentItems(order);
+        checkoutNavigation.complete();
         setPaymentReviewOpen(false);
         setPaymentReviewContext(null);
         setPaymentPrompt((current) => (
             current?.type === 'PAID'
-                ? current
+                ? { ...current, fulfillmentItems, receipt: { ...current.receipt, fulfillmentItems } }
                 : {
                     type: 'PAID',
                     reference: order?.reference || '',
@@ -1548,7 +1592,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     },
                 }
         ));
-    }, [buyer?.name, cartItems, order?.accessToken, order?.items, order?.paymentAmount, order?.paymentCurrency, order?.paymentTransactionStatus, order?.reference, order?.status, order?.totalAmount, order?.totalCurrency, selectedPaymentMethod?.name, store?.name]);
+    }, [buyer?.name, cartItems, expectedTrainingIds, order, selectedPaymentMethod?.name, store?.name]);
 
     const refreshPaidFulfillment = async () => {
         const reference = paymentPrompt?.reference || order?.reference;
@@ -1560,6 +1604,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         );
         setOrder(latest);
         const fulfillmentItems = orderFulfillmentItems(latest);
+        if (!isOrderPaid(latest)) {
+            setPaymentPrompt(null);
+            setReceiptOpen(false);
+            setShowOrderPaymentView(true);
+            return [];
+        }
         setPaymentPrompt((current) => (
             current?.type === 'PAID'
                 ? {
@@ -1573,7 +1623,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     };
 
     if (loading) {
-        return withMessages(<Screen><StateCard title={messages.loadingStorefront} /></Screen>);
+        return withMessages(<Screen wide><StorefrontSkeleton label={messages.loadingStorefront} /></Screen>);
     }
 
     if (loadError) {
@@ -1638,7 +1688,10 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 : null}
             account={selectedPaymentMethod?.type === 'MOBILE_MONEY' ? buyer.phone : null}
             busy={busy}
-            onClose={() => setPaymentReviewOpen(false)}
+            error={flowError}
+            onClose={checkoutNavigation.closeReview}
+            buyer={buyer}
+            onEditBuyer={checkoutSheetOpen ? () => checkoutNavigation.go(1) : undefined}
             onConfirm={confirmPayment}
         />
     ) : null;
@@ -1696,6 +1749,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     </dl>
 
                     <PaymentHandoff order={order} />
+                    {expectedTrainingIds.length > 0 && !isOrderPaid(order) && <p role="status">{messages.trainingAccessInactive}</p>}
                     <OrderPaymentPanel
                         order={order}
                         buyer={buyer}
@@ -1705,10 +1759,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         paymentMethods={paymentMethods}
                         paymentMethodsLoading={paymentMethodsLoading}
                         paymentMethodsError={paymentMethodsError}
+                        onRetryPaymentMethods={retryPaymentMethods}
                         paymentMethodsLoaded={paymentMethodsLoaded}
                         cryptoNetworks={cryptoNetworks}
                         cryptoNetworksLoading={cryptoNetworksLoading}
                         cryptoNetworksError={cryptoNetworksError}
+                        onRetryNetworks={() => setNetworkAttempt((value) => value + 1)}
                         selectedCryptoNetworkId={selectedCryptoNetworkId}
                         setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
@@ -1721,7 +1777,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         flowError={flowError}
                         busy={busy}
                         appCheckoutLink={appCheckoutLink}
-                        showAppCheckout={isMobileBrowser}
+                        showAppCheckout={isMobileBrowser && Boolean(appCheckoutLink)}
                         showAppInstallFallback={showAppInstallFallback}
                         onOpenAppCheckout={openFondekaAppCheckout}
                         onConfirm={reviewPayment}
@@ -1756,13 +1812,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             <Screen wide>
                 <ProductDetailPage
                     product={directProduct}
+                    syllabusPath={trainingOutlinePath({ lookup: productLookup, storeSlug: slug, productSlug })}
                     store={store}
                     quantity={Math.max(1, number(cart[directProduct.id]))}
                     activeImageIndex={activeProductImageIndex}
                     onImageChange={setActiveProductImageIndex}
                     onOpenGallery={(startIndex = 0) => setImageGallery({ product: directProduct, index: startIndex })}
                     onQuantityChange={(nextQuantity) => setQuantity(directProduct.id, Math.max(1, nextQuantity))}
-                    onPay={() => setCheckoutSheetOpen(true)}
+                    onPay={checkoutNavigation.open}
                     onPlayVideo={() => setActiveVideo({
                         url: directProduct.videoUrl,
                         poster: directProduct.videoThumbnailUrl || productImages(directProduct)[0] || '',
@@ -1771,10 +1828,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 <CheckoutSheet
                     open={checkoutSheetOpen}
                     title={messages.checkout}
-                    onClose={() => setCheckoutSheetOpen(false)}
+                    onClose={checkoutNavigation.close}
+                    busy={busy}
                 >
                     <CheckoutPaymentForm
                         cartItems={cartItems}
+                        navigation={checkoutNavigation}
                         buyer={buyer}
                         setBuyer={updateBuyer}
                         currencies={currencies}
@@ -1783,10 +1842,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         paymentMethods={paymentMethods}
                         paymentMethodsLoading={paymentMethodsLoading}
                         paymentMethodsError={paymentMethodsError}
+                        onRetryPaymentMethods={retryPaymentMethods}
                         paymentMethodsLoaded={paymentMethodsLoaded}
                         cryptoNetworks={cryptoNetworks}
                         cryptoNetworksLoading={cryptoNetworksLoading}
                         cryptoNetworksError={cryptoNetworksError}
+                        onRetryNetworks={() => setNetworkAttempt((value) => value + 1)}
                         selectedCryptoNetworkId={selectedCryptoNetworkId}
                         setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
@@ -1801,7 +1862,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         flowError={flowError}
                         busy={busy}
                         appCheckoutLink={appCheckoutLink}
-                        showAppCheckout={isMobileBrowser}
+                        showAppCheckout={isMobileBrowser && Boolean(appCheckoutLink)}
                         showAppInstallFallback={showAppInstallFallback}
                         onOpenAppCheckout={openFondekaAppCheckout}
                         onConfirm={reviewPayment}
@@ -1858,15 +1919,17 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     url: store.videoUrl,
                     poster: store.videoThumbnailUrl || store.bannerUrl || '',
                 })}
-                onPay={() => setCheckoutSheetOpen(true)}
+                onPay={checkoutNavigation.open}
             />
             <CheckoutSheet
                 open={checkoutSheetOpen}
                 title={messages.checkout}
-                onClose={() => setCheckoutSheetOpen(false)}
+                onClose={checkoutNavigation.close}
+                    busy={busy}
             >
                     <CheckoutPaymentForm
                         cartItems={cartItems}
+                        navigation={checkoutNavigation}
                         buyer={buyer}
                         setBuyer={updateBuyer}
                         currencies={currencies}
@@ -1875,10 +1938,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         paymentMethods={paymentMethods}
                         paymentMethodsLoading={paymentMethodsLoading}
                         paymentMethodsError={paymentMethodsError}
+                        onRetryPaymentMethods={retryPaymentMethods}
                         paymentMethodsLoaded={paymentMethodsLoaded}
                         cryptoNetworks={cryptoNetworks}
                         cryptoNetworksLoading={cryptoNetworksLoading}
                         cryptoNetworksError={cryptoNetworksError}
+                        onRetryNetworks={() => setNetworkAttempt((value) => value + 1)}
                         selectedCryptoNetworkId={selectedCryptoNetworkId}
                         setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
@@ -1893,7 +1958,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         flowError={flowError}
                         busy={busy}
                         appCheckoutLink={appCheckoutLink}
-                        showAppCheckout={isMobileBrowser}
+                        showAppCheckout={isMobileBrowser && Boolean(appCheckoutLink)}
                         showAppInstallFallback={showAppInstallFallback}
                         onOpenAppCheckout={openFondekaAppCheckout}
                         onConfirm={reviewPayment}
@@ -1978,7 +2043,7 @@ function ProductHero({ product, store, onOpenGallery }) {
 
 function Screen({ children, wide = false }) {
     return (
-        <main className="commerce-page">
+        <main className="commerce-page commerce-ui">
             <div className={wide ? 'commerce-shell' : 'commerce-shell commerce-shell--narrow'}>
                 <Brand />
                 {children}
@@ -1999,6 +2064,7 @@ function Brand() {
 function StateCard({ title, message, children }) {
     return (
         <section className="state-card">
+            <span className="commerce-icon-tile commerce-icon-tile--blue"><CommerceIcon name="bag" size={28} /></span>
             <h1>{title}</h1>
             {message && <p>{message}</p>}
             {children}
@@ -2024,20 +2090,22 @@ function ShareButton({ label = 'Share', text }) {
 
     return (
         <button type="button" className="profile-icon-button" onClick={handleShare} aria-label={resolvedLabel}>
-            ↗
+            <CommerceIcon name="share" />
         </button>
     );
 }
 
-function ProfileTopBar({ title = 'Fondeka Commerce', backHref = '/' }) {
+function ProfileTopBar({ title = 'Fondeka Commerce', backHref = '/', variant = 'default' }) {
     const messages = useCommerceMessages();
     const resolvedTitle = title === 'Fondeka Commerce' ? messages.fondekaCommerce : title === 'Product' ? messages.product : title;
     return (
-        <div className="profile-topbar">
+        <div className={`profile-topbar${variant === 'product' ? ' profile-topbar--product' : ''}`}>
             <a className="profile-back-button" href={backHref} aria-label={messages.back}>
-                ‹
+                <CommerceIcon name="back" />
             </a>
-            <strong>{resolvedTitle}</strong>
+            {variant === 'product' ? (
+                <span className="profile-topbar-title"><span className="profile-topbar-identity" aria-hidden="true"><CommerceIcon name="bag" size={22} /></span><strong>{resolvedTitle}</strong></span>
+            ) : <strong>{resolvedTitle}</strong>}
             <ShareButton />
         </div>
     );
@@ -2073,6 +2141,7 @@ function StoreProfilePage({
     onPay,
 }) {
     const messages = useCommerceMessages();
+    const tabPrefix = useId();
     const tabs = {
         PRODUCTS: (
             products.length ? (
@@ -2101,8 +2170,9 @@ function StoreProfilePage({
         <div className={`store-profile${cartCount ? ' store-profile--with-cart' : ''}`}>
             <ProfileTopBar title="Fondeka Commerce" />
             <StoreProfileHeader store={store} onPlayVideo={onStoreVideo} />
-            <StoreTabs activeTab={activeTab} onChange={onTabChange} />
-            <section className="store-tab-panel" aria-label={messages.storeTabs[activeTab]}>
+            <StoreTabs activeTab={activeTab} onChange={onTabChange} prefix={tabPrefix} />
+            {activeTab === 'PRODUCTS' && products.length > 0 && <div className="collection-heading"><span className="commerce-icon-tile commerce-icon-tile--blue"><CommerceIcon name="bag" /></span><div><h2>{messages.browseCollection}</h2><p>{interpolate(messages.productCount, { count: products.length })}</p></div></div>}
+            <section className="store-tab-panel" role="tabpanel" id={`${tabPrefix}-panel-${activeTab}`} aria-labelledby={`${tabPrefix}-tab-${activeTab}`} tabIndex={0}>
                 {tabs[activeTab]}
             </section>
             {cartCount > 0 && (
@@ -2137,6 +2207,7 @@ function StoreProfileHeader({ store, onPlayVideo }) {
                     <h1>{store?.name || store?.slug || messages.store}</h1>
                     {verified ? <VerifiedBadge /> : null}
                 </div>
+                {store?.description && <p className="store-description">{store.description}</p>}
                 {(memberSince || store?.countryCode) && (
                     <div className="store-profile-meta">
                         {memberSince && <span>{interpolate(messages.memberSince, { date: memberSince })}</span>}
@@ -2156,7 +2227,7 @@ function StoreProfileHeader({ store, onPlayVideo }) {
     );
 }
 
-function StoreTabs({ activeTab, onChange }) {
+function StoreTabs({ activeTab, onChange, prefix }) {
     const messages = useCommerceMessages();
     const activeIndex = Math.max(0, STORE_TABS.indexOf(activeTab));
     return (
@@ -2167,9 +2238,20 @@ function StoreTabs({ activeTab, onChange }) {
                     key={tab}
                     type="button"
                     role="tab"
+                    id={`${prefix}-tab-${tab}`}
+                    aria-controls={`${prefix}-panel-${tab}`}
+                    tabIndex={activeTab === tab ? 0 : -1}
                     aria-selected={activeTab === tab}
                     className={activeTab === tab ? 'store-tab store-tab--active' : 'store-tab'}
                     onClick={() => onChange(tab)}
+                    onKeyDown={(event) => {
+                        const index = STORE_TABS.indexOf(tab);
+                        const next = event.key === 'ArrowRight' ? (index + 1) % STORE_TABS.length : event.key === 'ArrowLeft' ? (index + STORE_TABS.length - 1) % STORE_TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? STORE_TABS.length - 1 : null;
+                        if (next == null) return;
+                        event.preventDefault();
+                        onChange(STORE_TABS[next]);
+                        document.getElementById(`${prefix}-tab-${STORE_TABS[next]}`)?.focus();
+                    }}
                 >
                     {messages.storeTabs[tab]}
                 </button>
@@ -2214,7 +2296,7 @@ function StoreContactActions({ store, compact = false }) {
             {!!contactLinks.length && (
                 <div className="store-contact-primary" aria-label={messages.storeContactActions}>
                     {contactLinks.map((link) => (
-                        <a key={link.key} href={link.href} target={link.key === 'whatsapp' ? '_blank' : undefined} rel={link.key === 'whatsapp' ? 'noreferrer' : undefined}>
+                        <a key={link.key} className={`store-contact-link--${link.key}`} href={link.href} target={link.key === 'whatsapp' ? '_blank' : undefined} rel={link.key === 'whatsapp' ? 'noreferrer' : undefined}>
                             {link.key === 'whatsapp' ? <WhatsAppIcon /> : <MailIcon />}
                             {link.label}
                         </a>
@@ -2224,8 +2306,8 @@ function StoreContactActions({ store, compact = false }) {
             {!!socialLinks.length && (
                 <div className="store-social-links" aria-label={messages.storeSocialLinks}>
                     {socialLinks.map((link) => (
-                        <a key={link.key} href={link.href} target="_blank" rel="noreferrer" aria-label={link.label}>
-                            {link.icon}
+                        <a key={link.key} className={`store-social-link store-social-link--${link.platform}`} href={link.href} target="_blank" rel="noreferrer" aria-label={link.label} title={link.label}>
+                            <SocialIcon platform={link.platform} />
                         </a>
                     ))}
                 </div>
@@ -2252,6 +2334,7 @@ function ProductTypeBadge({ product }) {
     if (type === 'PHYSICAL') return null;
     return (
         <span className={`product-type-badge product-type-badge--${type.toLowerCase()}`}>
+            <CommerceIcon name={type === 'TRAINING' ? 'book' : type === 'DIGITAL' ? 'file' : 'clock'} size={16} />
             {messages.productTypeLabels[type] || type}
         </span>
     );
@@ -2263,13 +2346,14 @@ function ProductFulfillmentNote({ product, compact = false }) {
     const type = fulfillment.type;
     if (type === 'PHYSICAL') return null;
 
-    const title = type === 'DIGITAL' ? messages.digitalDelivery : messages.servicePurchase;
-    const help = type === 'DIGITAL' ? messages.digitalDeliveryHelp : messages.servicePurchaseHelp;
+    const title = type === 'TRAINING' ? messages.trainingPurchase : type === 'DIGITAL' ? messages.digitalDelivery : messages.servicePurchase;
+    const help = type === 'TRAINING' ? messages.trainingPurchaseHelp : type === 'DIGITAL' ? messages.digitalDeliveryHelp : messages.servicePurchaseHelp;
 
     return (
         <div className={`fulfillment-note${compact ? ' fulfillment-note--compact' : ''}`}>
-            <strong>{title}</strong>
-            <span>{fulfillment.instructions || help}</span>
+            <CommerceIcon name={type === 'TRAINING' ? 'book' : type === 'DIGITAL' ? 'file' : 'clock'} size={21} />
+            <div><strong>{title}</strong>
+            <span>{type === 'TRAINING' ? help : fulfillment.instructions || help}</span></div>
         </div>
     );
 }
@@ -2280,10 +2364,25 @@ function paidFulfillmentItemKey(item) {
 
 function PaidFulfillmentList({ items, onRefresh }) {
     const messages = useCommerceMessages();
+    const [refreshing, setRefreshing] = useState(false);
+    const [refreshError, setRefreshError] = useState(false);
     const fulfillmentItems = (Array.isArray(items) ? items : [])
         .filter((item) => item.type !== 'PHYSICAL')
-        .filter((item) => item.downloadUrl || item.fulfillmentUrl || item.instructions);
+        .filter((item) => item.type === 'TRAINING' || item.downloadUrl || item.fulfillmentUrl || item.instructions);
     if (!fulfillmentItems.length) return null;
+
+    const refreshTraining = async () => {
+        setRefreshing(true);
+        setRefreshError(false);
+        try {
+            await onRefresh?.();
+        } catch {
+            // Never surface a protected request URL or backend error text in this UI.
+            setRefreshError(true);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const openDownload = async (item) => {
         let url = item.downloadUrl;
@@ -2304,6 +2403,23 @@ function PaidFulfillmentList({ items, onRefresh }) {
         <section className="paid-fulfillment-list">
             <h4>{messages.fulfillment}</h4>
             {fulfillmentItems.map((item) => {
+                if (item.type === 'TRAINING') {
+                    return (
+                        <div className="paid-fulfillment-item" key={item.key}>
+                            <strong>{item.name}</strong>
+                            {item.trainingPlayerUrl ? (
+                                <a className="payment-success-done training-start" href={item.trainingPlayerUrl} referrerPolicy="no-referrer" rel="noreferrer">
+                                    {messages.startTraining}
+                                </a>
+                            ) : (
+                                <>
+                                    <p role="status">{messages.trainingAccessPending}</p>
+                                    {onRefresh && <button type="button" className="button secondary" onClick={refreshTraining} disabled={refreshing}>{messages.retry}</button>}
+                                </>
+                            )}
+                        </div>
+                    );
+                }
                 const isDigital = item.type === 'DIGITAL';
                 return (
                     <div className="paid-fulfillment-item" key={item.key || item.name}>
@@ -2323,6 +2439,7 @@ function PaidFulfillmentList({ items, onRefresh }) {
                     </div>
                 );
             })}
+            {refreshError && <p role="alert">{messages.trainingAccessError}</p>}
         </section>
     );
 }
@@ -2393,7 +2510,7 @@ function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onR
                     onClick={onOpen}
                     aria-label={interpolate(messages.viewProduct, { name: product.name || product.slug || messages.product })}
                 >
-                    {image ? <img src={image} alt="" /> : initials(product.name)}
+                    <CommerceImage src={image} fallback={initials(product.name)} />
                 </button>
                 {product.videoUrl && <VideoPlayButton onClick={onPlayVideo} label={messages.playVideo} />}
             </div>
@@ -2402,15 +2519,26 @@ function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onR
                 <ProductTypeBadge product={product} />
                 <strong className="profile-product-price">{amount(product.priceAmount, product.priceCurrency)}</strong>
                 <div className="profile-product-actions">
-                    {quantity > 0 && (
+                    {isTraining(product) ? (
                         <>
-                            <button type="button" className="profile-qty-button" onClick={onRemove} disabled={out} aria-label={messages.decreaseQuantity}>−</button>
-                            <span>{quantity}</span>
+                            <button type="button" className="profile-add-button" onClick={onAdd} disabled={out || quantity > 0}>
+                                {quantity > 0 ? messages.trainingInCart : messages.add}
+                            </button>
+                            {quantity > 0 && <button type="button" className="training-remove" onClick={onRemove}>{messages.removeTraining}</button>}
+                        </>
+                    ) : (
+                        <>
+                            {quantity > 0 && (
+                                <>
+                                    <button type="button" className="profile-qty-button" onClick={onRemove} disabled={out} aria-label={messages.decreaseQuantity}>−</button>
+                                    <span>{quantity}</span>
+                                </>
+                            )}
+                            <button type="button" className={quantity > 0 ? 'profile-add-button profile-add-button--icon' : 'profile-add-button'} onClick={onAdd} disabled={out}>
+                                {quantity > 0 ? '+' : messages.add}
+                            </button>
                         </>
                     )}
-                    <button type="button" className={quantity > 0 ? 'profile-add-button profile-add-button--icon' : 'profile-add-button'} onClick={onAdd} disabled={out}>
-                        {quantity > 0 ? '+' : messages.add}
-                    </button>
                 </div>
             </div>
         </article>
@@ -2444,6 +2572,7 @@ function StickyCheckoutBar({ count, total, onPay }) {
 
 function ProductDetailPage({
     product,
+    syllabusPath,
     store,
     quantity,
     activeImageIndex,
@@ -2463,7 +2592,7 @@ function ProductDetailPage({
 
     return (
         <div className="product-detail-page">
-            <ProfileTopBar title={messages.product} backHref={storeHref !== '#' ? storeHref : '/'} />
+            <ProfileTopBar title={messages.product} backHref={storeHref !== '#' ? storeHref : '/'} variant="product" />
             <div className="product-detail-layout">
                 <section className="product-detail-media-col">
                     <div
@@ -2476,7 +2605,7 @@ function ProductDetailPage({
                             disabled={!activeImage}
                             aria-label={activeImage ? interpolate(messages.zoomProduct, { name: product.name }) : product.name}
                         >
-                            {activeImage ? <img src={activeImage} alt={product.name || ''} /> : <span>{initials(product.name)}</span>}
+                            <CommerceImage src={activeImage} alt={product.name || ''} fallback={initials(product.name)} />
                         </button>
                         {product.videoUrl && <VideoPlayButton onClick={onPlayVideo} label={messages.playVideo} />}
                         {storeName && (
@@ -2506,6 +2635,7 @@ function ProductDetailPage({
                 </section>
 
                 <section className="product-detail-copy">
+                    <ProductTypeBadge product={product} />
                     <div className="product-name-row">
                         <h1>{product.name || product.slug || messages.product}</h1>
                         {whatsappHref && (
@@ -2515,45 +2645,53 @@ function ProductDetailPage({
                         )}
                     </div>
                     <div className="product-price-badge">
-                        <span>ⓘ</span>
                         <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
                     </div>
-                    <ProductTypeBadge product={product} />
                     <ProductFulfillmentNote product={product} />
-                    {product.description && (
-                        <div className="product-description-section">
-                            <h2>{messages.description}</h2>
-                            <p>{product.description}</p>
-                        </div>
-                    )}
+                    <div className="product-inline-buy">{!isTraining(product) && <ProductPurchaseQuantity quantity={quantity} onChange={onQuantityChange} />}<button type="button" className="product-pay-button" onClick={onPay}>{messages.paySecurely}<CommerceIcon name="arrow" size={18} /></button></div>
+                    {product.description && <ProductDescription description={product.description} />}
+                    {isTraining(product) && <TrainingSyllabus path={syllabusPath} messages={messages} />}
                 </section>
             </div>
             <div className="product-sticky-buy-row">
-                <div className="product-buy-qty">
-                    <button type="button" onClick={() => onQuantityChange(quantity - 1)} disabled={quantity <= 1} aria-label={messages.decreaseQuantity}>−</button>
-                    <span>{quantity}</span>
-                    <button type="button" onClick={() => onQuantityChange(quantity + 1)} aria-label={messages.increaseQuantity}>+</button>
-                </div>
-                <button type="button" className="product-pay-button" onClick={onPay}>{messages.pay}</button>
+                {isTraining(product) && <div className="product-buy-summary"><span>{messages.productTypeLabels.TRAINING}</span><strong>{amount(product.priceAmount, product.priceCurrency)}</strong></div>}
+                {!isTraining(product) && <ProductPurchaseQuantity quantity={quantity} onChange={onQuantityChange} />}
+                <button type="button" className="product-pay-button" onClick={onPay}>{messages.paySecurely}<CommerceIcon name="arrow" size={18} /></button>
             </div>
         </div>
     );
 }
 
-function CheckoutSheet({ open, title, onClose, children }) {
+function ProductPurchaseQuantity({ quantity, onChange }) {
+    const messages = useCommerceMessages();
+    return <div className="product-buy-qty"><button type="button" onClick={() => onChange(quantity - 1)} disabled={quantity <= 1} aria-label={messages.decreaseQuantity}>−</button><span>{quantity}</span><button type="button" onClick={() => onChange(quantity + 1)} aria-label={messages.increaseQuantity}>+</button></div>;
+}
+
+function ProductDescription({ description }) {
+    const messages = useCommerceMessages();
+    const [expanded, setExpanded] = useState(false);
+    const long = description.length > 220;
+    return <div className="product-description-section">
+        <h2>{messages.description}</h2><p className={long ? 'description-excerpt' : ''}>{description}</p>
+        {long && <button type="button" className="commerce-text-button" onClick={() => setExpanded(true)}>{messages.readMore}<CommerceIcon name="arrow" size={16} /></button>}
+        {expanded && <DialogBackdrop className="payment-action-backdrop" label={messages.description} onClose={() => setExpanded(false)}><div className="payment-action-modal description-dialog"><div className="payment-action-header"><h2>{messages.description}</h2><button type="button" className="commerce-close-button" onClick={() => setExpanded(false)} aria-label={messages.close}><CommerceIcon name="close" /></button></div><p>{description}</p></div></DialogBackdrop>}
+    </div>;
+}
+
+function CheckoutSheet({ open, title, onClose, children, busy = false }) {
     const messages = useCommerceMessages();
     if (!open) return null;
     return (
-        <div className="checkout-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+        <DialogBackdrop className="checkout-sheet-backdrop" label={messages.checkout} onClose={onClose} locked={busy}>
             <div className="checkout-sheet" onClick={(event) => event.stopPropagation()}>
                 <div className="checkout-sheet-handle" aria-hidden="true" />
                 <div className="checkout-sheet-header">
-                    <h2>{title}</h2>
-                    <button type="button" onClick={onClose}>{messages.close}</button>
+                    <div className="checkout-sheet-title"><span className="commerce-icon-tile"><CommerceIcon name="bag" /></span><div><h2>{title}</h2><p>{messages.checkoutContext}</p></div></div>
+                    <button type="button" className="commerce-close-button" onClick={onClose} disabled={busy} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 </div>
                 {children}
             </div>
-        </div>
+        </DialogBackdrop>
     );
 }
 
@@ -2563,14 +2701,6 @@ function LoadingButtonLabel({ label }) {
             <span className="button-spinner" aria-hidden="true" />
             <span>{label}</span>
         </span>
-    );
-}
-
-function ChevronDownIcon({ className = 'payment-country-chevron' }) {
-    return (
-        <svg className={className} width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-            <path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
     );
 }
 
@@ -2601,37 +2731,43 @@ function MailIcon({ className = 'mail-icon' }) {
     );
 }
 
-function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker }) {
+function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker, errors = {}, disabled = false }) {
     const messages = useCommerceMessages();
+    const prefix = useId();
     const update = (key, value) => setBuyer((current) => ({ ...current, [key]: value }));
     const localPhone = nationalPhoneNumber(buyer.phone, selectedCountry);
-
+    const fieldProps = (key) => ({ id: `${prefix}-${key}`, 'aria-invalid': Boolean(errors[key]), 'aria-describedby': errors[key] ? `${prefix}-${key}-error` : undefined, disabled });
     return (
-        <div className="buyer-fields">
-            <label>
-                <span>{messages.name}</span>
-                <input value={buyer.name} onChange={(event) => update('name', event.target.value)} placeholder={messages.buyerName} />
-            </label>
-            <label>
-                <span>{messages.email}</span>
-                <input value={buyer.email} onChange={(event) => update('email', event.target.value)} placeholder="buyer@example.com" inputMode="email" />
-            </label>
-            <label>
-                <span>{messages.phone}</span>
+        <div className="buyer-fields" onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.target.tagName !== 'INPUT') return;
+            event.preventDefault();
+            const inputs = [...event.currentTarget.querySelectorAll('input:not(:disabled)')];
+            const next = inputs[inputs.indexOf(event.target) + 1];
+            if (next) next.focus({ preventScroll: true });
+            else event.target.blur();
+        }}>
+            <div className="commerce-field">
+                <label htmlFor={`${prefix}-name`}>{messages.name}</label>
+                <input {...fieldProps('name')} autoComplete="name" enterKeyHint="next" value={buyer.name} onChange={(event) => update('name', event.target.value)} placeholder={messages.buyerName} />
+                {errors.name && <span className="field-error" id={`${prefix}-name-error`}>{errors.name}</span>}
+            </div>
+            <div className="commerce-field">
+                <label htmlFor={`${prefix}-email`}>{messages.email}</label>
+                <input {...fieldProps('email')} type="email" autoComplete="email" enterKeyHint="next" autoCapitalize="none" spellCheck={false} value={buyer.email} onChange={(event) => update('email', event.target.value)} placeholder="buyer@example.com" inputMode="email" />
+                {errors.email && <span className="field-error" id={`${prefix}-email-error`}>{errors.email}</span>}
+            </div>
+            <div className="commerce-field">
+                <label htmlFor={`${prefix}-phone`}>{messages.phone}</label>
                 <div className="phone-input-row">
-                    <button type="button" className="phone-code-button" onClick={onOpenCountryPicker}>
-                        <span aria-hidden="true">{selectedCountry?.flag}</span>
+                    <button type="button" className="phone-code-button" onClick={onOpenCountryPicker} disabled={disabled} aria-label={messages.chooseCountry} aria-haspopup="dialog">
+                        <span className="commerce-country-flag" aria-hidden="true">{selectedCountry?.flag}</span>
                         <strong>+{selectedCountry?.callingCode || '243'}</strong>
-                        <ChevronDownIcon />
+                        <DropdownChevron />
                     </button>
-                    <input
-                        value={localPhone}
-                        onChange={(event) => update('phone', combinePhoneNumber(selectedCountry, event.target.value))}
-                        placeholder="997371767"
-                        inputMode="tel"
-                    />
+                    <input {...fieldProps('phone')} type="tel" autoComplete="tel-national" enterKeyHint="done" value={localPhone} onChange={(event) => update('phone', combinePhoneNumber(selectedCountry, event.target.value))} placeholder="997371767" inputMode="tel" />
                 </div>
-            </label>
+                {errors.phone && <span className="field-error" id={`${prefix}-phone-error`}>{errors.phone}</span>}
+            </div>
         </div>
     );
 }
@@ -2673,142 +2809,113 @@ function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, 
 }
 
 function CheckoutPaymentForm({
-    cartItems,
-    buyer,
-    setBuyer,
-    currencies,
-    paymentMethod,
-    setPaymentMethod,
-    paymentMethods,
-    paymentMethodsLoading,
-    paymentMethodsError,
-    paymentMethodsLoaded,
-    cryptoNetworks,
-    cryptoNetworksLoading,
-    cryptoNetworksError,
-    selectedCryptoNetworkId,
-    setSelectedCryptoNetworkId,
-    selectedCountry,
-    buyerDetailsOpen,
-    setBuyerDetailsOpen,
-    onOpenCountryPicker,
-    quote,
-    checkout,
-    flowError,
-    busy,
-    appCheckoutLink,
-    showAppCheckout,
-    showAppInstallFallback,
-    onOpenAppCheckout,
-    onConfirm,
+    cartItems, navigation, buyer, setBuyer, paymentMethod, setPaymentMethod, onRetryPaymentMethods, onRetryNetworks,
+    paymentMethods, paymentMethodsLoading, paymentMethodsError, paymentMethodsLoaded,
+    cryptoNetworks, cryptoNetworksLoading, cryptoNetworksError, selectedCryptoNetworkId,
+    setSelectedCryptoNetworkId, selectedCountry, onOpenCountryPicker, flowError, busy,
+    appCheckoutLink, showAppCheckout, showAppInstallFallback, onOpenAppCheckout, onConfirm,
 }) {
     const messages = useCommerceMessages();
-    const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
-    const cartSubtotalLabel = formatCartTotals(cartItems);
-
+    const step = navigation.step;
+    const [attempted, setAttempted] = useState(null);
+    const panel = useRef(null);
+    const heading = useRef(null);
+    const errors = attempted === 1 ? {
+        ...(!buyer.name.trim() ? { name: messages.buyerNameRequired } : {}),
+        ...(!buyer.email.trim() ? { email: messages.buyerEmailRequired } : {}),
+        ...(!buyer.phone.trim() ? { phone: messages.buyerPhoneRequired } : {}),
+    } : {};
+    const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
+    const localError = attempted === 0 && !cartItems.length ? messages.chooseAtLeastOneProduct
+        : attempted === 2 && !selectedMethod ? messages.noPaymentSelected
+        : attempted === 2 && selectedMethod?.type === 'CRYPTO' && !selectedCryptoNetworkId ? messages.chooseCryptoNetwork
+        : null;
+    const titles = [messages.orderQuestion, messages.detailsQuestion, messages.methodQuestion];
+    const helpers = [messages.orderHelper, messages.detailsHelper, messages.methodHelper];
+    const icons = ['bag', 'user', 'card'];
+    useEffect(() => {
+        setAttempted(null);
+        heading.current?.focus({ preventScroll: true });
+        panel.current?.querySelector('.commerce-scroll-region')?.scrollTo({ top: 0 });
+    }, [step]);
+    const next = () => {
+        if (busy) return;
+        setAttempted(step);
+        if (step === 0 && !cartItems.length) return;
+        if (step === 1 && (!buyer.name.trim() || !buyer.email.trim() || !buyer.phone.trim())) {
+            requestAnimationFrame(() => panel.current?.querySelector('[aria-invalid="true"]')?.focus({ preventScroll: true }));
+            return;
+        }
+        if (step === 2) {
+            if (!selectedMethod || (selectedMethod.type === 'CRYPTO' && !selectedCryptoNetworkId)) return;
+            if (document.activeElement?.tagName === 'INPUT') document.activeElement.blur();
+            onConfirm();
+        } else {
+            if (document.activeElement?.tagName === 'INPUT') document.activeElement.blur();
+            navigation.go(step + 1);
+        }
+    };
+    const subtotal = formatCartTotals(cartItems);
     return (
-        <section className="commerce-payment-flow" aria-label={messages.payment}>
-            <section className="payment-step-card">
-                <div className="payment-step-heading payment-step-heading--primary">
-                    <span>1</span>
-                    <div>
-                        <strong>{messages.orderTotal}</strong>
-                        <small>{cartItems.length ? `${cartItems.length} ${cartItems.length === 1 ? messages.lineItemSingular : messages.lineItemPlural}` : messages.noItemsSelected}</small>
-                    </div>
+        <section className="guided-checkout" aria-label={messages.payment} ref={panel} onKeyDown={(event) => { if (event.key === 'Enter' && event.target.tagName === 'INPUT' && event.target.type !== 'radio') event.preventDefault(); }}>
+            <StepProgress step={step} labels={messages.checkoutSteps} text={interpolate(messages.stepOf, { step: step + 1, total: 4 })} />
+            <div className="checkout-task-scroll commerce-scroll-region" role="region" aria-label={messages.checkoutSteps[step]} tabIndex={0}>
+            <div className="checkout-task-grid">
+                <div className="checkout-task-card">
+                    <header className="checkout-task-heading">
+                        <span className={`commerce-icon-tile commerce-icon-tile--${step === 1 ? 'blue' : 'green'}`}><CommerceIcon name={icons[step]} size={24} /></span>
+                        <h3 tabIndex={-1} ref={heading} aria-live="polite">{titles[step]}</h3>
+                        <p>{helpers[step]}</p>
+                    </header>
+                    {step === 0 && (
+                        <div className="checkout-order-items">
+                            {cartItems.map(({ product, quantity }) => (
+                                <article className="checkout-order-item" key={product.id}>
+                                    <div className="checkout-item-image"><CommerceImage src={productImage(product)} fallback={initials(product.name)} /></div>
+                                    <div className="checkout-item-copy"><strong>{product.name}</strong><ProductTypeBadge product={product} /><span>{messages.quantityLabel}: {quantity}</span></div>
+                                    <b>{amount(number(product.priceAmount) * quantity, product.priceCurrency)}</b>
+                                </article>
+                            ))}
+                            <div className="checkout-subtotal"><span>{messages.estimatedSubtotal}</span><strong>{subtotal || '—'}</strong></div>
+                            {cartItems.some(({ product }) => isTraining(product)) && <div className="checkout-training-note"><CommerceIcon name="book" /><p>{messages.trainingPurchaseHelp}</p></div>}
+                            {!cartItems.length && <p className="muted">{messages.chooseProducts}</p>}
+                        </div>
+                    )}
+                    {step === 1 && <BuyerFields buyer={buyer} setBuyer={setBuyer} selectedCountry={selectedCountry} onOpenCountryPicker={onOpenCountryPicker} errors={errors} disabled={busy} />}
+                    {step === 2 && (
+                        <>
+                            <div className="checkout-contact-review"><div><strong>{buyer.name}</strong><span>{buyer.email}</span></div><button type="button" className="commerce-text-button" onClick={() => navigation.go(1)} disabled={busy}>{messages.edit}</button></div>
+                            <PaymentMethodPicker
+                                paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} buyer={buyer} setBuyer={setBuyer}
+                                methods={paymentMethods} loading={paymentMethodsLoading} error={paymentMethodsError} loaded={paymentMethodsLoaded} onRetry={onRetryPaymentMethods} onRetryNetworks={onRetryNetworks}
+                                cryptoNetworks={cryptoNetworks} cryptoNetworksLoading={cryptoNetworksLoading} cryptoNetworksError={cryptoNetworksError}
+                                selectedCryptoNetworkId={selectedCryptoNetworkId} setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
+                                selectedCountry={selectedCountry} onOpenCountryPicker={onOpenCountryPicker} disabled={busy}
+                            />
+                            {showAppCheckout && <FondekaAppPaymentPanel appCheckoutLink={appCheckoutLink} disabled={!cartItems.length || busy} showInstallFallback={showAppInstallFallback} onOpen={onOpenAppCheckout} />}
+                        </>
+                    )}
+                    {Object.keys(errors).length > 0 && <div className="inline-error" role="alert">{messages.checkDetails}</div>}
                 </div>
-
-                {cartItems.length ? (
-                    <div className="cart-lines payment-cart-lines">
-                        {cartItems.map(({ product, quantity }) => (
-                            <div className="cart-line" key={product.id}>
-                                <div>
-                                    <strong>{product.name}</strong>
-                                    <ProductTypeBadge product={product} />
-                                    <span>{quantity} x {amount(product.priceAmount, product.priceCurrency)}</span>
-                                    <ProductFulfillmentNote product={product} compact />
-                                </div>
-                                <b>{amount(number(product.priceAmount) * number(quantity), product.priceCurrency)}</b>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-	                    <p className="muted">{messages.chooseProducts}</p>
-                )}
-
-                {cartItems.length > 0 && (
-                    <div className="commerce-payment-total">
-	                        <span>{messages.estimatedSubtotal}</span>
-	                        <strong>{cartSubtotalLabel}</strong>
-	                    </div>
-                )}
-            </section>
-
-            <section className="payment-step-card">
-                <div className="payment-step-heading">
-                    <span>2</span>
-                    <div>
-	                        <strong>{messages.buyerDetails}</strong>
-	                        <small>{messages.buyerDetailsHelp}</small>
-                    </div>
-                </div>
-                <BuyerDetailsSection
-                    buyer={buyer}
-                    setBuyer={setBuyer}
-                    selectedCountry={selectedCountry}
-                    open={buyerDetailsOpen}
-                    setOpen={setBuyerDetailsOpen}
-                    onOpenCountryPicker={onOpenCountryPicker}
-                />
-            </section>
-
-            <section className="payment-step-card">
-                <div className="payment-step-heading">
-                    <span>3</span>
-                    <div>
-	                        <strong>{messages.howToPay}</strong>
-	                        <small>{messages.feesChecked}</small>
-                    </div>
-                </div>
-
-                <PaymentMethodPicker
-                    paymentMethod={paymentMethod}
-                    setPaymentMethod={setPaymentMethod}
-                    buyer={buyer}
-                    setBuyer={setBuyer}
-                    methods={paymentMethods}
-                    loading={paymentMethodsLoading}
-                    error={paymentMethodsError}
-                    loaded={paymentMethodsLoaded}
-                    cryptoNetworks={cryptoNetworks}
-                    cryptoNetworksLoading={cryptoNetworksLoading}
-                    cryptoNetworksError={cryptoNetworksError}
-                    selectedCryptoNetworkId={selectedCryptoNetworkId}
-                    setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
-                    selectedCountry={selectedCountry}
-                    onOpenCountryPicker={onOpenCountryPicker}
-	                    actionLabel={messages.startPayment}
-	                    actionLoadingLabel={messages.startingPayment}
-                    actionDisabled={busy || !cartItems.length}
-                    actionBusy={busy}
-                    onAction={onConfirm}
-                />
-
-                {showAppCheckout && (
-                    <FondekaAppPaymentPanel
-                        appCheckoutLink={appCheckoutLink}
-                        disabled={!cartItems.length}
-                        showInstallFallback={showAppInstallFallback}
-                        onOpen={onOpenAppCheckout}
-                    />
-                )}
-
-                {flowError && (
-                    isFeatureDisabled(flowError)
-                        ? <Unavailable message={flowError.message} />
-                        : <InlineError message={flowError.message} />
-                )}
-            </section>
-
+                <aside className="checkout-side-summary" aria-label={messages.orderSummary}>
+                    <CommerceIcon name="bag" size={22} /><h3>{messages.orderSummary}</h3>
+                    {cartItems.map(({ product, quantity }) => <div className="checkout-side-line" key={product.id}><span>{product.name}<small>× {quantity}</small></span><strong>{amount(number(product.priceAmount) * quantity, product.priceCurrency)}</strong></div>)}
+                    <div className="checkout-side-total"><span>{messages.estimatedSubtotal}</span><strong>{subtotal || '—'}</strong></div>
+                    <p><CommerceIcon name="shield" size={17} />{messages.feesChecked}</p>
+                    {step > 0 && <button type="button" className="commerce-text-button" onClick={() => navigation.go(0)} disabled={busy}>{messages.edit} · {messages.orderSummary}</button>}
+                </aside>
+            </div>
+            </div>
+            <div className="checkout-flow-footer">
+            {localError && <InlineError message={localError} />}
+            {step === 2 && flowError && (isFeatureDisabled(flowError) ? <Unavailable message={flowError.message} /> : <InlineError message={flowError.message} />)}
+            <footer className="checkout-flow-actions">
+                <button type="button" className="button secondary" onClick={navigation.back} disabled={busy}><CommerceIcon name="back" size={18} />{messages.back}</button>
+                <button type="button" className="button primary" onClick={next} disabled={busy || !cartItems.length}>
+                    {busy ? <LoadingButtonLabel label={messages.quoteLoading} /> : <>{step === 2 ? messages.reviewAction : messages.nextStep}<CommerceIcon name="arrow" size={18} /></>}
+                </button>
+            </footer>
+            </div>
         </section>
     );
 }
@@ -2822,6 +2929,8 @@ function OrderPaymentPanel({
     paymentMethods,
     paymentMethodsLoading,
     paymentMethodsError,
+    onRetryPaymentMethods,
+    onRetryNetworks,
     paymentMethodsLoaded,
     cryptoNetworks,
     cryptoNetworksLoading,
@@ -2877,6 +2986,8 @@ function OrderPaymentPanel({
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
+                    onRetry={onRetryPaymentMethods}
+                    onRetryNetworks={onRetryNetworks}
                     loaded={paymentMethodsLoaded}
                     cryptoNetworks={cryptoNetworks}
                     cryptoNetworksLoading={cryptoNetworksLoading}
@@ -2950,6 +3061,8 @@ function PaymentMethodPicker({
     methods,
     loading,
     error,
+    onRetry,
+    onRetryNetworks,
     loaded = false,
     cryptoNetworks,
     cryptoNetworksLoading,
@@ -2966,6 +3079,7 @@ function PaymentMethodPicker({
     onAction,
 }) {
     const messages = useCommerceMessages();
+    const prefix = useId();
     const grouped = groupedPaymentMethods(methods);
     const groupKeys = Object.keys(grouped);
     const firstAvailableGroup = groupKeys[0] || '';
@@ -3006,15 +3120,16 @@ function PaymentMethodPicker({
                     className="payment-country-chip"
                     onClick={onOpenCountryPicker}
                     disabled={disabled}
+                    aria-haspopup="dialog"
                 >
-                    <span aria-hidden="true">{selectedCountry?.flag}</span>
-	                    <strong>{selectedCountry?.name || selectedCountry?.code || messages.countryFallback}</strong>
-                    <ChevronDownIcon />
+                    <span className="commerce-country-flag" aria-hidden="true">{selectedCountry?.flag}</span>
+                    <strong>{selectedCountry?.name || selectedCountry?.code || messages.countryFallback}</strong>
+                    <DropdownChevron />
                 </button>
             </div>
 
             {loading && <div className="payment-method-status">{messages.loadingPaymentMethods}</div>}
-            {error && <div className="payment-method-status payment-method-status--error">{error.message}</div>}
+            {error && <div className="payment-method-status payment-method-status--error" role="alert"><p>{error.message}</p>{onRetry && <button type="button" className="commerce-text-button" onClick={onRetry} disabled={loading}>{messages.refreshMethods}</button>}</div>}
 
             {groupKeys.length ? (
                 <div className="payment-method-list">
@@ -3025,37 +3140,31 @@ function PaymentMethodPicker({
                                 className={`payment-method-accordion-header${expanded[type] ? ' payment-method-accordion-header--open' : ''}`}
                                 onClick={() => toggleGroup(type)}
                                 aria-expanded={!!expanded[type]}
+                                aria-controls={`${prefix}-${type}`}
                                 disabled={disabled}
                             >
-	                                <span>{messages.paymentTypeLabels[type] || type}</span>
+                                <span className="payment-group-identity"><CommerceIcon name={({ MOBILE_MONEY: 'phone', CRYPTO: 'coin', CARD: 'card', BANK_TRANSFER: 'bank', WALLET: 'wallet', BALANCE: 'wallet' })[type] || 'card'} size={22} /></span>
+                                <span className="payment-group-copy"><strong>{messages.paymentTypeLabels[type] || type}</strong><small>{messages.paymentGroupHelp[type]}</small></span>
                                 <span className="payment-method-accordion-icon" aria-hidden="true">
-                                    <ChevronDownIcon className="payment-method-chevron" />
+                                    <CommerceIcon name="chevron" size={16} className="payment-method-chevron" />
                                 </span>
                             </button>
                             {expanded[type] && (
-                                <div className="payment-method-accordion-body">
-                                    <div className="payment-method-tile-grid">
+                                <div className="payment-method-accordion-body" id={`${prefix}-${type}`}>
+                                    <div className="payment-method-tile-grid" role="radiogroup" aria-label={messages.paymentTypeLabels[type] || type}>
                                         {grouped[type].map((method) => {
                                             const active = method.key === paymentMethod;
                                             return (
-                                                <button
-                                                    type="button"
+                                                <label
                                                     key={method.key}
                                                     className={`payment-method-tile${active ? ' payment-method-tile--active' : ''}`}
-                                                    onClick={() => selectMethod(method, type)}
-                                                    aria-pressed={active}
-                                                    disabled={disabled}
+                                                    title={method.name}
                                                 >
-                                                    {method.logoUrl ? (
-                                                        <img className="payment-method-tile-image" src={method.logoUrl} alt="" />
-                                                    ) : (
-                                                        <span className="payment-method-tile-logo" aria-hidden="true">
-                                                            {methodInitials(method)}
-                                                        </span>
-                                                    )}
-                                                    {method.currency && <span className={currencyBadgeClass(method.currency)}>{method.currency}</span>}
-                                                    <strong>{method.name}</strong>
-                                                </button>
+                                                    <span className="payment-provider-icon"><CommerceImage src={method.logoUrl} fallback={methodInitials(method)} /></span>
+                                                    <span className="payment-provider-copy"><strong>{method.name}</strong></span>
+                                                    {method.currency && <span className="payment-provider-currency" data-currency={String(method.currency).trim().toUpperCase()}>{method.currency}</span>}
+                                                    <input type="radio" name={`${prefix}-method`} value={method.key} checked={active} onChange={() => selectMethod(method, type)} disabled={disabled} aria-label={method.currency ? `${method.name}, ${method.currency}` : method.name} />
+                                                </label>
                                             );
                                         })}
                                     </div>
@@ -3066,6 +3175,7 @@ function PaymentMethodPicker({
                                             networks={cryptoNetworks}
                                             loading={cryptoNetworksLoading}
                                             error={cryptoNetworksError}
+                                            onRetry={onRetryNetworks}
                                             selectedNetworkId={selectedCryptoNetworkId}
                                             onSelect={setSelectedCryptoNetworkId}
                                             disabled={disabled}
@@ -3106,11 +3216,12 @@ function PaymentMethodPicker({
 
 function MobileMoneyPhoneSelector({ buyer, selectedCountry, onChangeDigits, disabled }) {
     const messages = useCommerceMessages();
+    const phoneId = useId();
     const localPhone = nationalPhoneNumber(buyer?.phone, selectedCountry);
 
     return (
         <div className="mobile-money-phone-panel">
-            <label className="mobile-money-phone-label">{messages.mobileMoneyPhone}</label>
+            <label className="mobile-money-phone-label" htmlFor={phoneId}>{messages.mobileMoneyPhone}</label>
             <div className="mobile-money-phone-row">
                 <input
                     className="mobile-money-code-input"
@@ -3121,6 +3232,9 @@ function MobileMoneyPhoneSelector({ buyer, selectedCountry, onChangeDigits, disa
                 />
                 <input
                     className="mobile-money-number-input"
+                    id={phoneId}
+                    enterKeyHint="done"
+                    onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.blur(); } }}
                     type="tel"
                     inputMode="numeric"
                     value={localPhone}
@@ -3137,40 +3251,32 @@ function MobileMoneyPromptModal({ number, hint, onClose }) {
     const messages = useCommerceMessages();
     const target = hint || formatPhone(number) || messages.yourPhone;
     return (
-        <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+        <DialogBackdrop className="payment-action-backdrop" label={messages.confirmOnPhone} onClose={onClose} locked={false}>
             <div className="payment-action-modal" onClick={(event) => event.stopPropagation()}>
                 <div className="payment-action-header">
                     <h3>{messages.confirmOnPhone}</h3>
-                    <button type="button" className="payment-action-close" onClick={onClose}>{messages.close}</button>
+                    <button type="button" className="payment-action-close" onClick={onClose} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 </div>
                 <p className="payment-action-copy">
 	                    {interpolate(messages.mobileMoneyPrompt, { target })}
                 </p>
             </div>
-        </div>
+        </DialogBackdrop>
     );
 }
 
 function PaymentSuccessModal({ reference, total, fulfillmentItems, onRefreshFulfillment, onReceipt, onClose }) {
     const messages = useCommerceMessages();
     return (
-        <div className="payment-action-backdrop payment-success-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+        <DialogBackdrop className="payment-action-backdrop payment-success-backdrop" label={messages.paymentReceived} onClose={onClose} locked={false}>
             <div className="payment-action-modal payment-success-modal" onClick={(event) => event.stopPropagation()}>
-                <div className="payment-success-graffiti" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                </div>
                 <div className="payment-action-header payment-success-header">
 	                    <span className="payment-success-kicker">{messages.orderConfirmed}</span>
-	                    <button type="button" className="payment-action-close" onClick={onClose}>{messages.close}</button>
+	                    <button type="button" className="payment-action-close" onClick={onClose} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 </div>
                 <div className="payment-success-mark-wrap">
                     <div className="payment-success-ring" aria-hidden="true" />
-                    <div className="payment-success-mark" aria-hidden="true">✓</div>
+                    <div className="payment-success-mark" aria-hidden="true"><CommerceIcon name="check" size={32} /></div>
                 </div>
 	                <h3 className="payment-success-title">{messages.paymentReceived}</h3>
                 <p className="payment-action-copy payment-success-copy">
@@ -3191,10 +3297,10 @@ function PaymentSuccessModal({ reference, total, fulfillmentItems, onRefreshFulf
                     )}
                 </div>
                 <PaidFulfillmentList items={fulfillmentItems} onRefresh={onRefreshFulfillment} />
-	                <button type="button" className="payment-success-done" onClick={onClose}>{messages.done}</button>
+	                <button type="button" className={fulfillmentItems?.some((item) => item.trainingPlayerUrl) ? 'payment-success-receipt-button' : 'payment-success-done'} onClick={onClose}>{messages.done}</button>
 	                <button type="button" className="payment-success-receipt-button" onClick={onReceipt}>{messages.receipt}</button>
             </div>
-        </div>
+        </DialogBackdrop>
     );
 }
 
@@ -3209,7 +3315,7 @@ function CommerceReceiptModal({ receipt, onRefreshFulfillment, onClose }) {
     const fulfillmentItems = Array.isArray(receipt?.fulfillmentItems) ? receipt.fulfillmentItems : [];
 
     return (
-        <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+        <DialogBackdrop className="payment-action-backdrop" label={messages.receipt} onClose={onClose} locked={false}>
             <div className="commerce-receipt" onClick={(event) => event.stopPropagation()}>
                 <div className="commerce-receipt-head">
                     <div className="brand-mark" aria-hidden="true" />
@@ -3242,7 +3348,7 @@ function CommerceReceiptModal({ receipt, onRefreshFulfillment, onClose }) {
                 </div>
 	                <button type="button" className="payment-success-done" onClick={onClose}>{messages.close}</button>
             </div>
-        </div>
+        </DialogBackdrop>
     );
 }
 
@@ -3255,11 +3361,11 @@ function CryptoPaymentModal({ address, amount, networkName, invoiceUrl, expiresA
     const expiryLabel = formatExpiry(expiresAt);
 
     return (
-        <div className="payment-action-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+        <DialogBackdrop className="payment-action-backdrop" label={messages.sendCryptoPayment} onClose={onClose} locked={false}>
             <div className="payment-action-modal payment-action-modal--crypto" onClick={(event) => event.stopPropagation()}>
                 <div className="payment-action-header">
                     <h3>{messages.sendCryptoPayment}</h3>
-                    <button type="button" className="payment-action-close" onClick={onClose}>{messages.close}</button>
+                    <button type="button" className="payment-action-close" onClick={onClose} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 </div>
 
                 {hint && <div className="payment-action-hint">{hint}</div>}
@@ -3288,11 +3394,11 @@ function CryptoPaymentModal({ address, amount, networkName, invoiceUrl, expiresA
                     </div>
                 </div>
             </div>
-        </div>
+        </DialogBackdrop>
     );
 }
 
-function PaymentReviewSheet({ quote, method, network, account, busy, onClose, onConfirm }) {
+function PaymentReviewSheet({ quote, method, network, account, buyer, onEditBuyer, busy, error, onClose, onConfirm }) {
     const messages = useCommerceMessages();
     if (!quote) return null;
     const netAmount = quote.netAmount ?? quote.billingAmount ?? quote.itemSubtotalAmount;
@@ -3308,14 +3414,18 @@ function PaymentReviewSheet({ quote, method, network, account, busy, onClose, on
         && String(railCurrency).toUpperCase() !== String(totalCurrency || '').toUpperCase();
 
     return (
-        <div className="payment-review-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+        <DialogBackdrop className="payment-review-backdrop" label={messages.reviewPayment} onClose={onClose} locked={busy}>
             <div className="payment-review-sheet" onClick={(event) => event.stopPropagation()}>
                 <div className="payment-review-handle" aria-hidden="true" />
                 <div className="payment-review-sheet-header">
                     <h3>{messages.reviewPayment}</h3>
-                    <button type="button" className="payment-review-close" onClick={onClose}>{messages.close}</button>
+                    <button type="button" className="payment-review-close" onClick={onClose} disabled={busy} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 </div>
 
+                <StepProgress step={3} labels={messages.checkoutSteps} text={interpolate(messages.stepOf, { step: 4, total: 4 })} />
+                <div className="payment-review-scroll commerce-scroll-region" role="region" aria-label={messages.reviewPayment} tabIndex={0}>
+                <div className="review-identity"><span className="commerce-icon-tile"><CommerceIcon name="shield" size={26} /></span><p>{messages.reviewHelper}</p></div>
+                {buyer && <div className="checkout-contact-review"><div><strong>{buyer.name}</strong><span>{buyer.email}</span></div>{onEditBuyer && <button type="button" className="commerce-text-button" onClick={onEditBuyer} disabled={busy}>{messages.edit}</button>}</div>}
                 <div className="payment-review-summary">
 	                    <ReviewSummaryLine label={messages.checkoutAmount} value={amount(netAmount, netCurrency)} />
 	                    <ReviewSummaryLine label={messages.fees} value={fees != null ? amount(fees, feeCurrency) : '-'} />
@@ -3328,8 +3438,12 @@ function PaymentReviewSheet({ quote, method, network, account, busy, onClose, on
 	                    {account && <ReviewSummaryLine label={messages.account} value={account} />}
                 </div>
 
+                <p className="review-notice">{messages.reviewNotice}</p>
+                </div>
+                <div className="payment-review-footer">
+                {error && <InlineError message={error.message} />}
                 <div className="payment-review-actions">
-                    <button type="button" className="payment-review-action payment-review-action--secondary" onClick={onClose}>
+                    <button type="button" className="payment-review-action payment-review-action--secondary" onClick={onClose} disabled={busy}>
                         {messages.back}
                     </button>
                     <button
@@ -3338,11 +3452,12 @@ function PaymentReviewSheet({ quote, method, network, account, busy, onClose, on
                         onClick={onConfirm}
                         disabled={busy}
                     >
-                        {busy ? messages.submitting : messages.confirmPayment}
+                        {busy ? <LoadingButtonLabel label={messages.submitting} /> : <>{messages.confirmPayment}<CommerceIcon name="arrow" size={18} /></>}
                     </button>
                 </div>
+                </div>
             </div>
-        </div>
+        </DialogBackdrop>
     );
 }
 
@@ -3355,13 +3470,13 @@ function ReviewSummaryLine({ label, value, highlight = false }) {
     );
 }
 
-function CryptoNetworkSelector({ networks, loading, error, selectedNetworkId, onSelect, disabled }) {
+function CryptoNetworkSelector({ networks, loading, error, selectedNetworkId, onSelect, onRetry, disabled }) {
     const messages = useCommerceMessages();
     return (
         <div className="crypto-network-panel">
             <div className="crypto-network-label">{messages.network}</div>
             {loading && <div className="payment-method-status">{messages.loadingCryptoNetworks}</div>}
-            {error && <div className="payment-method-status payment-method-status--error">{error.message}</div>}
+            {error && <div className="payment-method-status payment-method-status--error" role="alert"><p>{error.message}</p>{onRetry && <button type="button" className="commerce-text-button" onClick={onRetry} disabled={loading || disabled}>{messages.retry}</button>}</div>}
             {!loading && !error && networks?.length ? (
                 <div className="crypto-network-pills">
                     {networks.map((network) => {
@@ -3394,12 +3509,12 @@ function CountryPickerModal({ open, countries, query, selectedCode, onQueryChang
     if (!open) return null;
 
     return (
-        <div className="country-sheet-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+        <DialogBackdrop className="country-sheet-backdrop" label={messages.chooseCountry} onClose={onClose} locked={false}>
             <div className="country-sheet" onClick={(event) => event.stopPropagation()}>
                 <div className="country-sheet-handle" aria-hidden="true" />
                 <div className="country-sheet-header">
                     <h3>{messages.chooseCountry}</h3>
-                    <button type="button" className="country-sheet-close" onClick={onClose}>{messages.close}</button>
+                    <button type="button" className="country-sheet-close" onClick={onClose} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 </div>
                 <div className="country-search-wrap">
                     <input
@@ -3407,9 +3522,11 @@ function CountryPickerModal({ open, countries, query, selectedCode, onQueryChang
                         value={query}
                         onChange={(event) => onQueryChange(event.currentTarget.value)}
                         placeholder={messages.searchCountry}
+                        aria-label={messages.searchCountry}
+                        type="search"
                     />
                 </div>
-                <div className="country-list">
+                <div className="country-list commerce-scroll-region" role="region" aria-label={messages.chooseCountry} tabIndex={0}>
                     {countries.map((country) => {
                         const selected = country.code === selectedCode;
                         return (
@@ -3418,13 +3535,14 @@ function CountryPickerModal({ open, countries, query, selectedCode, onQueryChang
                                 key={country.code}
                                 className={`country-row${selected ? ' country-row--selected' : ''}`}
                                 onClick={() => onSelect(country)}
+                                aria-pressed={selected}
                             >
-                                <span className="country-row-flag" aria-hidden="true">{country.flag}</span>
+                                <span className="commerce-country-flag country-row-flag" aria-hidden="true">{country.flag}</span>
                                 <span className="country-row-main">
                                     <span className="country-row-name">{country.name}</span>
                                     <span className="country-row-meta">{country.code} · +{country.callingCode}</span>
                                 </span>
-                                <span className="country-row-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+                                <span className="country-row-check" aria-hidden="true">{selected && <CommerceIcon name="check" size={16} />}</span>
                             </button>
                         );
                     })}
@@ -3433,12 +3551,12 @@ function CountryPickerModal({ open, countries, query, selectedCode, onQueryChang
                     )}
                 </div>
             </div>
-        </div>
+        </DialogBackdrop>
     );
 }
 
 function InlineError({ message }) {
-    return <div className="inline-error">{message}</div>;
+    return <div className="inline-error" role="alert">{message}</div>;
 }
 
 function Unavailable({ message }) {
@@ -3482,8 +3600,7 @@ function MoneySummary({ data }) {
 
 function PaymentHandoff({ order }) {
     const messages = useCommerceMessages();
-    const status = String(order?.status || '').toUpperCase();
-    if (status === 'PAID') {
+    if (isOrderPaid(order)) {
         return (
             <div className="payment-handoff payment-handoff--paid">
                 <strong>{messages.paymentCollected}</strong>
@@ -3531,26 +3648,12 @@ function VideoViewer({ video, onClose }) {
 
     useEffect(() => {
         const fallback = window.setTimeout(() => setLoading(false), 4500);
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        closeRef.current?.focus();
-
-        const handleKeyDown = (event) => {
-            if (event.key === 'Escape') onClose();
-        };
-        window.addEventListener('keydown', handleKeyDown);
-
         const player = videoRef.current;
-        return () => {
-            window.clearTimeout(fallback);
-            window.removeEventListener('keydown', handleKeyDown);
-            document.body.style.overflow = previousOverflow;
-            player?.pause();
-        };
-    }, [onClose, video.url]);
+        return () => { window.clearTimeout(fallback); player?.pause(); };
+    }, [video.url]);
 
     return (
-        <div className="video-viewer-backdrop" role="dialog" aria-modal="true" aria-label={messages.playVideo} onClick={onClose}>
+        <DialogBackdrop className="video-viewer-backdrop" label={messages.playVideo} onClose={onClose} locked={false}>
             <section className="video-viewer" onClick={(event) => event.stopPropagation()}>
                 <div className="video-viewer-header">
                     <button ref={closeRef} type="button" className="video-close-button" onClick={onClose} aria-label={messages.close}>
@@ -3584,7 +3687,7 @@ function VideoViewer({ video, onClose }) {
                     </div>
                 ) : null}
             </section>
-        </div>
+        </DialogBackdrop>
     );
 }
 
@@ -3602,7 +3705,7 @@ function ProductImageGallery({ product, index = 0, onIndexChange, onClose }) {
     };
 
     return (
-        <div className="image-gallery-backdrop" role="dialog" aria-modal="true" aria-label={messages.productImages} onClick={onClose}>
+        <DialogBackdrop className="image-gallery-backdrop" label={messages.productImages} onClose={onClose} locked={false}>
             <section className="image-gallery" onClick={(event) => event.stopPropagation()}>
                 <div className="image-gallery-header">
                     <div>
@@ -3615,7 +3718,7 @@ function ProductImageGallery({ product, index = 0, onIndexChange, onClose }) {
                 <div className="image-gallery-stage">
                     {hasMany && (
                         <button type="button" className="image-gallery-nav image-gallery-nav--prev" onClick={() => goTo(safeIndex - 1)} aria-label={messages.previousImage}>
-                            ‹
+                            <CommerceIcon name="back" />
                         </button>
                     )}
                     <img src={currentImage} alt={product.name || ''} />
@@ -3643,7 +3746,7 @@ function ProductImageGallery({ product, index = 0, onIndexChange, onClose }) {
                     </div>
                 )}
             </section>
-        </div>
+        </DialogBackdrop>
     );
 }
 
@@ -3653,9 +3756,9 @@ function ProductDialog({ product, quantity, onClose, onOpenGallery, onIncrement,
     const images = productImages(product);
     const image = images[0];
     return (
-        <div className="dialog-backdrop" onClick={onClose} role="presentation">
-            <section className="dialog" role="dialog" aria-modal="true" aria-label={product.name} onClick={(event) => event.stopPropagation()}>
-                <button className="dialog-close" onClick={onClose} aria-label={messages.close}>x</button>
+        <DialogBackdrop className="dialog-backdrop" label={product.name} onClose={onClose} locked={false}>
+            <section className="dialog" onClick={(event) => event.stopPropagation()}>
+                <button className="dialog-close" onClick={onClose} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 <button
                     type="button"
                     className="dialog-preview dialog-preview--button"
@@ -3684,12 +3787,18 @@ function ProductDialog({ product, quantity, onClose, onOpenGallery, onIncrement,
                 <ProductTypeBadge product={product} />
                 <p>{product.description || messages.noDescription}</p>
                 <ProductFulfillmentNote product={product} />
+                {isTraining(product) && <TrainingSyllabus path={trainingOutlinePath({ lookup: product.id })} messages={messages} />}
                 <div className="product-meta">
                     <strong>{amount(product.priceAmount, product.priceCurrency)}</strong>
                     <span>{inventoryLabel(product, messages)}</span>
                 </div>
-                <Quantity quantity={quantity} onIncrement={onIncrement} onDecrement={onDecrement} disabled={out} />
+                {isTraining(product) ? (
+                    <div className="training-cart-actions">
+                        <button type="button" className="button primary" onClick={onIncrement} disabled={out || quantity > 0}>{quantity > 0 ? messages.trainingInCart : messages.add}</button>
+                        {quantity > 0 && <button type="button" className="button secondary" onClick={onDecrement}>{messages.removeTraining}</button>}
+                    </div>
+                ) : <Quantity quantity={quantity} onIncrement={onIncrement} onDecrement={onDecrement} disabled={out} />}
             </section>
-        </div>
+        </DialogBackdrop>
     );
 }

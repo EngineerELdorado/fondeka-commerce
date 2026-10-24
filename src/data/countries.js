@@ -3,11 +3,12 @@
 // Ordered with DR Congo first, then alphabetical.
 
 // Helper to render emoji flags from ISO2 codes (e.g., "CD" -> "🇨🇩")
-export const codeToFlag = (code = '') =>
-    code
-        .toUpperCase()
-        .replace(/./g, c => String.fromCodePoint(127397 + c.charCodeAt()))
-        .slice(0, 2);
+export const codeToFlag = (code = '') => {
+    const isoCode = String(code).trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(isoCode)) return '';
+    // Each regional indicator uses two UTF-16 units; preserve both indicators.
+    return Array.from(isoCode, letter => String.fromCodePoint(127397 + letter.charCodeAt(0))).join('');
+};
 
 const COUNTRIES = [
     { cca2: 'CD', name: 'Congo', callingCode: '243' }, // DR Congo first
@@ -69,7 +70,6 @@ const COUNTRIES = [
     { cca2: 'CO', name: 'Colombia', callingCode: '57' },
     { cca2: 'KM', name: 'Comoros', callingCode: '269' },
     { cca2: 'CG', name: 'Congo (Brazza)', callingCode: '242' },
-    { cca2: 'CD', name: 'Congo', callingCode: '243' },
     { cca2: 'CK', name: 'Cook Islands', callingCode: '682' },
     { cca2: 'CR', name: 'Costa Rica', callingCode: '506' },
     { cca2: 'CI', name: "Côte d'Ivoire", callingCode: '225' },

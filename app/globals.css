@@ -1,4 +1,5 @@
 :root {
+    color-scheme: light;
     --brand: #4f805c;
     --brand-dark: #2f5b3b;
     --brand-soft: #e9f3ec;
@@ -12,6 +13,82 @@
     --danger: #b91c1c;
     --danger-bg: #fef2f2;
     --shadow: 0 18px 48px rgba(17, 24, 39, 0.08);
+}
+
+.product-type-badge--training {
+    color: var(--brand-dark);
+    background: var(--brand-soft);
+}
+
+.training-syllabus {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    overflow-wrap: anywhere;
+}
+
+.training-syllabus h2 {
+    margin: 0 0 16px;
+    font-size: 20px;
+}
+
+.training-modules {
+    margin: 0;
+    padding-left: 24px;
+}
+
+.training-modules > li + li {
+    margin-top: 20px;
+}
+
+.training-modules h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.training-materials {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.training-materials li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+}
+
+.training-material-type {
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.training-cart-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.training-remove {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.paid-fulfillment-item .training-start {
+    display: block;
+    width: 100%;
+    padding: 13px 16px;
+    background: var(--brand);
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
 }
 
 * {
