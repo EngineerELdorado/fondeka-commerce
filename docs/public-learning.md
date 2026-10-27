@@ -4,7 +4,7 @@ Implemented in `fondeka-commerce`, 2026-10-25. The Business portal continues to 
 
 ## Buyer journey
 
-- **My learning / Mes formations** is available on the storefront and the Commerce homepage, including mobile.
+- **My learning / Mes formations** appears in a store's header only when a training is confirmed in that store's public catalog. It stays hidden for empty/non-training stores and while discovery is loading or unavailable. Loaded trainings show it immediately; otherwise a background read follows the existing public catalog pagination, including from non-training product-detail pages. These reads stop at the first training or final page and are cancelled when leaving/changing the store. The paid-training confirmation link, direct learning page and general Commerce homepage entry remain available independently of this navigation check.
 - The existing checkout still polls payment and makes the exact backend **Start training** player URL available only after eligible payment. Pending, partially paid, failed, disputed and refunded purchases remain locked.
 - Eligible paid items with both backend URLs are remembered in React memory for the active tab. **My learning** opens their inline player in Commerce without repeating email verification. A reload or new device uses purchase recovery; bearer URLs are never persisted in browser storage.
 - On another device, the buyer enters their purchase email, receives a verification code, and verifies it here. The restricted backend learner session lists its authorized training purchases. This does not create or sign in to a Fondeka account.
@@ -65,13 +65,17 @@ The HTTPS reverse proxy must preserve the public `Host` and overwrite `X-Forward
 
 Availability check on 2026-10-25: the currently configured API returned `503 TRAINING_RECOVERY_UNAVAILABLE` for `https://commerce.fondeka.com`; local origins `http://localhost:4100` and `http://192.168.178.55:4100` were rejected by CORS with 403. Enable/configure the backend recovery feature and approved origins before testing real email codes. This read-only check did not request a code or use learner credentials.
 
+The current scoped backend fix request and acceptance checks are in [backend-training-recovery-unavailable.md](backend-training-recovery-unavailable.md). It reuses the existing endpoints and preserves account, checkout and payment behavior.
+
 Do not enable request/response body logging, fetch URL logging, analytics breadcrumbs or third-party error capture for the gateway or learner page. Apply [private proxy logging](../deploy/nginx/commerce-private-logging.conf) to backend token routes and follow [private training storage](commerce-training-storage.md). These checked-in examples do not change live infrastructure.
 
 ## Verification
 
-`npm test` covers paid eligibility, quantity rules, exact URLs, scoped recovery, private DTO stripping, access expiry, CSRF/cookie forwarding, upstream allowlisting, same-origin enforcement, expected HTTP outcomes and terminal 404 behavior.
+`npm test` covers paid eligibility, quantity rules, exact URLs, scoped recovery, private DTO stripping, access expiry, CSRF/cookie forwarding, upstream allowlisting, same-origin enforcement, expected HTTP outcomes and terminal 404 behavior. Store navigation checks also cover complete and paginated public catalogs, direct-product discovery, cancellation and failed/malformed responses.
 
 Validated on 2026-10-25: 24 Node checks passed, the isolated production build passed, and synthetic browser checks passed at 320px, 390px and 1440px in English/French with a dark browser preference still rendering the light interface. Browser coverage included incorrect/correct code verification, HttpOnly recovery cookies, library/course navigation, backend-selected next material, completion refresh, fresh file access/expiry/retry, material 404/storage errors, access revocation when returning to the tab, session end, safe history/storage/metadata and checkout-to-learning handoff. No real email or payment was sent by these fixtures.
+
+Store navigation validated on 2026-10-27: all 30 Node checks and the isolated production build passed. All 52 synthetic browser cases passed in English/French at 390px and 1440px, covering training and non-training stores, empty/loading/error states, trainings beyond the first 20 and 100 products, direct-product discovery, unchanged cart/navigation behavior and public-read-only discovery.
 
 Build and browser checks must use an isolated build directory while the regular development server is running, so `.next` output does not collide. Use synthetic mail codes, cookies and links for browser fixtures. Real email delivery, deployed recovery configuration, HTTPS cookies, proxy logs, payment providers and private storage need environment-specific verification; frontend fixtures do not prove those integrations.
 

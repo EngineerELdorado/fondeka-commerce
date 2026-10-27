@@ -12,6 +12,7 @@ import { CommerceIcon, CommerceImage, DialogBackdrop, DropdownChevron, SocialIco
 import { COMMERCE_UI_COPY } from '../../../lib/commerce-ui-copy';
 import COUNTRY_DATA from '../../../src/data/countries';
 import { MyLearningLink, useLearningSession } from '../../learning-session';
+import { storeOffersTraining } from '../../../lib/store-training.mjs';
 
 const PAGE_SIZE = 20;
 const BUYER_DETAILS_STORAGE_KEY = 'fondeka-commerce-buyer-details';
@@ -1009,6 +1010,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [language, setLanguage] = useState('en');
     const [store, setStore] = useState(initialStore);
     const [products, setProducts] = useState(seededProducts);
+    const [publicCatalog, setPublicCatalog] = useState(null);
+    const [catalogTraining, setCatalogTraining] = useState(null);
     const [cart, setCart] = useState(initialCart || {});
     const [buyer, setBuyer] = useState({ name: '', email: '', phone: '' });
     const [buyerDetailsLoaded, setBuyerDetailsLoaded] = useState(false);
@@ -1051,7 +1054,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [loadError, setLoadError] = useState(initialLoadError);
     const [flowError, setFlowError] = useState(null);
     const knownStoreSlug = store?.slug || slug || seededProducts[0]?.storeSlug || '';
-    const messages = useMemo(() => ({ ...COMMERCE_MESSAGES[normalizeCommerceLanguage(language)], ...COMMERCE_UI_COPY[normalizeCommerceLanguage(language)], language: normalizeCommerceLanguage(language), storeSlug: knownStoreSlug }), [language, knownStoreSlug]);
+    const loadedTraining = products.some(isTraining);
+    const showMyLearning = !loading && !loadError && (loadedTraining || (catalogTraining?.storeSlug === knownStoreSlug && catalogTraining.available));
+    const messages = useMemo(() => ({ ...COMMERCE_MESSAGES[normalizeCommerceLanguage(language)], ...COMMERCE_UI_COPY[normalizeCommerceLanguage(language)], language: normalizeCommerceLanguage(language), storeSlug: knownStoreSlug, showMyLearning }), [language, knownStoreSlug, showMyLearning]);
     const checkoutNavigation = useCheckoutNavigation({ setOpen: setCheckoutSheetOpen, setReviewOpen: setPaymentReviewOpen, canReview: Boolean(paymentReviewContext?.quote || quote), busy });
     const paymentSubmissionLock = useRef(false);
     const quoteSubmissionLock = useRef(false);
@@ -1088,6 +1093,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                 storePayload = await apiFetch(`/public/commerce/stores/${encodedSlug}`);
                 const productsPayload = await apiFetch(`/public/commerce/stores/${encodedSlug}/products?page=0&size=${PAGE_SIZE}`);
                 loadedProducts = pageItems(productsPayload);
+                setPublicCatalog({ storeSlug: storePayload.slug || slug, page: productsPayload });
             }
 
             setStore(storePayload);
@@ -1108,6 +1114,25 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         if (hasInitialState) return;
         load();
     }, [hasInitialState, load]);
+
+    useEffect(() => {
+        setCatalogTraining(null);
+        if (loading || loadError || loadedTraining || !knownStoreSlug) return;
+        const task = new AbortController();
+        const encodedSlug = encodeURIComponent(knownStoreSlug);
+        storeOffersTraining({
+            initialPage: publicCatalog?.storeSlug === knownStoreSlug ? publicCatalog.page : null,
+            initialSize: PAGE_SIZE,
+            signal: task.signal,
+            readPage: (page, size, signal) => apiFetch(`/public/commerce/stores/${encodedSlug}/products?page=${page}&size=${size}`, { signal }),
+        }).then(available => {
+            if (!task.signal.aborted) setCatalogTraining({ storeSlug: knownStoreSlug, available });
+        }).catch(() => {
+            // Discovery is optional navigation. Failed/unknown catalogs stay hidden;
+            // checkout and valid paid-training access remain independent.
+        });
+        return () => task.abort();
+    }, [loading, loadError, loadedTraining, knownStoreSlug, publicCatalog]);
 
     useEffect(() => {
         if (typeof navigator !== 'undefined') {
@@ -2053,7 +2078,7 @@ function Screen({ children, wide = false }) {
     return (
         <main className="commerce-page commerce-ui">
             <div className={wide ? 'commerce-shell' : 'commerce-shell commerce-shell--narrow'}>
-                <div className="storefront-header"><Brand /><MyLearningLink store={messages.storeSlug} language={messages.language} /></div>
+                <div className="storefront-header"><Brand />{messages.showMyLearning && <MyLearningLink store={messages.storeSlug} language={messages.language} />}</div>
                 {children}
             </div>
         </main>
