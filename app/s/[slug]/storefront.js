@@ -2509,13 +2509,11 @@ function StoreReviews({ reviews, storeName }) {
 
 function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onRemove }) {
     const messages = useCommerceMessages();
-    const [mediaShape, setMediaShape] = useState(null);
     const out = inventoryLabel(product, messages) === messages.outOfStock;
     const images = productImages(product);
     const image = images[0];
-    const imageRatio = mediaShape && mediaShape.src === image ? mediaShape.ratio : 1.05;
     return (
-        <article className="profile-product-card" style={{ '--product-image-ratio': imageRatio }}>
+        <article className="profile-product-card">
             <div className="profile-product-media-wrap">
                 <button
                     type="button"
@@ -2523,10 +2521,7 @@ function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onR
                     onClick={onOpen}
                     aria-label={interpolate(messages.viewProduct, { name: product.name || product.slug || messages.product })}
                 >
-                    <CommerceImage src={image} fallback={initials(product.name)} onLoad={(event) => {
-                        const { naturalWidth, naturalHeight } = event.currentTarget;
-                        if (naturalWidth && naturalHeight) setMediaShape({ src: image, ratio: Math.max(0.67, Math.min(1.9, naturalWidth / naturalHeight)) });
-                    }} />
+                    <CommerceImage src={image} fallback={initials(product.name)} />
                 </button>
                 {product.videoUrl && <VideoPlayButton onClick={onPlayVideo} label={messages.playVideo} />}
             </div>
