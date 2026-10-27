@@ -107,15 +107,29 @@
 .commerce-ui .collection-heading p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 .commerce-ui .profile-product-grid { gap: 20px; grid-template-columns: repeat(4, minmax(0,1fr)); align-items: start; }
 .commerce-ui .profile-product-grid.is-masonry { grid-auto-flow: row; grid-auto-rows: 1px; row-gap: 0; }
-.commerce-ui .profile-product-card { display: flex; flex-direction: column; align-self: start; border-color: var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); transition: box-shadow 180ms, border-color 180ms; }
+.commerce-ui .profile-product-card { --product-scrim: color-mix(in srgb, var(--ink) 60%, #000); position: relative; isolation: isolate; display: grid; grid-template-areas: 'product'; grid-template-columns: minmax(0,1fr); width: 100%; min-height: 240px; align-self: start; border-color: var(--line); border-radius: 18px; background: var(--ink); color: var(--on-accent); box-shadow: var(--shadow); transition: box-shadow 180ms, border-color 180ms; }
+.commerce-ui .profile-product-card::before { content: ''; grid-area: product; width: 100%; aspect-ratio: var(--product-image-ratio, 1.05); pointer-events: none; }
 .commerce-ui .profile-product-card:hover { box-shadow: var(--shadow-hover); border-color: color-mix(in srgb, var(--brand) 25%, var(--line)); }
-.commerce-ui .profile-product-media { aspect-ratio: auto; min-height: 88px; background: var(--surface-raised); color: var(--brand); }
-.commerce-ui .profile-product-media img { display: block; height: auto; max-height: 480px; object-fit: contain; transition: transform 220ms; }
-.commerce-ui .profile-product-media .commerce-media-fallback { height: auto; aspect-ratio: 1.05; }
+.commerce-ui .profile-product-media-wrap { grid-area: product; min-width: 0; }
+.commerce-ui .profile-product-media { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; background: var(--surface-raised); color: var(--brand); }
+.commerce-ui .profile-product-media img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 220ms; }
+.commerce-ui .profile-product-media .commerce-media-fallback { height: 100%; align-content: start; padding-top: 20%; }
+.commerce-ui .profile-product-card .video-play-button { left: auto; top: 12px; right: 12px; width: 44px; height: 44px; transform: none; }
+.commerce-ui .profile-product-card .video-play-button:hover { transform: scale(1.04); }
 .commerce-ui .profile-product-card:hover .profile-product-media img { transform: scale(1.025); }
-.commerce-ui .profile-product-body { display: flex; flex-direction: column; gap: 9px; padding: 16px; }
-.commerce-ui .profile-product-name { display: block; width: 100%; overflow: visible; overflow-wrap: anywhere; -webkit-line-clamp: unset; color: var(--ink); font-size: 15px; line-height: 1.45; min-height: 44px; font-weight: 600; }
-.commerce-ui .profile-product-price { color: var(--ink); font-size: 19px; line-height: 1.4; font-weight: 650; font-variant-numeric: tabular-nums; }
+.commerce-ui .profile-product-body { grid-area: product; align-self: end; z-index: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 56px 16px 16px; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--product-scrim) 84%, transparent) 56px, color-mix(in srgb, var(--product-scrim) 98%, transparent) 100%); pointer-events: none; }
+.commerce-ui .profile-product-body button { pointer-events: auto; }
+.commerce-ui .profile-product-name { display: -webkit-box; width: 100%; overflow: hidden; overflow-wrap: anywhere; -webkit-line-clamp: 3; -webkit-box-orient: vertical; color: var(--on-accent); font-size: 15px; line-height: 1.45; min-height: 44px; font-weight: 650; text-shadow: 0 1px 3px #0006; }
+.commerce-ui .profile-product-price { color: var(--on-accent); font-size: 19px; line-height: 1.4; font-weight: 650; font-variant-numeric: tabular-nums; }
+.commerce-ui .profile-product-purchase { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.commerce-ui .profile-product-purchase .profile-product-actions { margin-top: 0; color: var(--on-accent); }
+.commerce-ui .profile-product-body > .product-type-badge { min-height: 26px; padding: 4px 7px; border-color: color-mix(in srgb, var(--on-accent) 24%, transparent); background: color-mix(in srgb, var(--type-accent) 22%, transparent); color: color-mix(in srgb, var(--type-accent) 28%, var(--on-accent)); font-size: 11px; }
+.commerce-ui .profile-product-body .product-type-badge .commerce-icon { width: 14px; height: 14px; }
+.commerce-ui .profile-product-body .profile-qty-button { border: 1px solid color-mix(in srgb, var(--on-accent) 28%, transparent); background: color-mix(in srgb, var(--on-accent) 12%, transparent); color: var(--on-accent); }
+.commerce-ui .profile-product-body .training-remove { color: var(--on-accent); text-decoration: underline; text-underline-offset: 3px; }
+.commerce-ui .profile-product-body .profile-add-button--added:disabled { opacity: 1; background: color-mix(in srgb, var(--brand) 34%, var(--product-scrim)); color: var(--brand-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-soft) 32%, transparent); }
+.commerce-ui .profile-product-body button:focus-visible { outline-color: var(--on-accent); }
+.commerce-ui .profile-product-media:focus-visible { outline-color: var(--on-accent); outline-offset: -6px; box-shadow: inset 0 0 0 8px var(--brand); }
 .commerce-ui .product-type-badge { --type-accent: var(--brand); --type-surface: var(--brand-soft); display: inline-flex; align-items: center; gap: 7px; min-height: 32px; border: 1px solid color-mix(in srgb, var(--type-accent) 24%, transparent); padding: 6px 10px; font-size: 12px; font-weight: 650; line-height: 1.2; border-radius: 10px; background: var(--type-surface); color: var(--type-accent); }
 .commerce-ui .product-type-badge--training { --type-accent: var(--violet); --type-surface: var(--violet-soft); }
 .commerce-ui .product-type-badge--digital { --type-accent: var(--blue); --type-surface: var(--blue-soft); }
@@ -409,7 +423,8 @@
     .commerce-ui .store-avatar { left: 20px; width: 84px; height: 84px; border-radius: 22px; }
     .commerce-ui .store-name-line h1 { font-size: 28px; }
     .commerce-ui .profile-product-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
-    .commerce-ui .profile-product-body { padding: 12px; gap: 8px; }
+    .commerce-ui .profile-product-card { min-height: 220px; }
+    .commerce-ui .profile-product-body { padding: 56px 12px 12px; gap: 8px; }
     .commerce-ui .profile-product-name { font-size: 14px; }
     .commerce-ui .profile-product-price { font-size: 17px; }
     .commerce-ui .profile-product-actions { gap: 4px; }

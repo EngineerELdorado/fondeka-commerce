@@ -2509,11 +2509,13 @@ function StoreReviews({ reviews, storeName }) {
 
 function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onRemove }) {
     const messages = useCommerceMessages();
+    const [mediaShape, setMediaShape] = useState(null);
     const out = inventoryLabel(product, messages) === messages.outOfStock;
     const images = productImages(product);
     const image = images[0];
+    const imageRatio = mediaShape && mediaShape.src === image ? mediaShape.ratio : 1.05;
     return (
-        <article className="profile-product-card">
+        <article className="profile-product-card" style={{ '--product-image-ratio': imageRatio }}>
             <div className="profile-product-media-wrap">
                 <button
                     type="button"
@@ -2521,35 +2523,40 @@ function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onR
                     onClick={onOpen}
                     aria-label={interpolate(messages.viewProduct, { name: product.name || product.slug || messages.product })}
                 >
-                    <CommerceImage src={image} fallback={initials(product.name)} />
+                    <CommerceImage src={image} fallback={initials(product.name)} onLoad={(event) => {
+                        const { naturalWidth, naturalHeight } = event.currentTarget;
+                        if (naturalWidth && naturalHeight) setMediaShape({ src: image, ratio: Math.max(0.67, Math.min(1.9, naturalWidth / naturalHeight)) });
+                    }} />
                 </button>
                 {product.videoUrl && <VideoPlayButton onClick={onPlayVideo} label={messages.playVideo} />}
             </div>
             <div className="profile-product-body">
-                <button type="button" className="profile-product-name" onClick={onOpen}>{product.name || product.slug || messages.product}</button>
+                <button type="button" className="profile-product-name" onClick={onOpen} title={product.name || product.slug || messages.product}>{product.name || product.slug || messages.product}</button>
                 <ProductTypeBadge product={product} />
-                <strong className="profile-product-price">{amount(product.priceAmount, product.priceCurrency)}</strong>
-                <div className="profile-product-actions">
-                    {isTraining(product) ? (
-                        <>
-                            <button type="button" className="profile-add-button" onClick={onAdd} disabled={out || quantity > 0}>
-                                {quantity > 0 ? messages.trainingInCart : messages.add}
-                            </button>
-                            {quantity > 0 && <button type="button" className="training-remove" onClick={onRemove}>{messages.removeTraining}</button>}
-                        </>
-                    ) : (
-                        <>
-                            {quantity > 0 && (
-                                <>
-                                    <button type="button" className="profile-qty-button" onClick={onRemove} disabled={out} aria-label={messages.decreaseQuantity}>−</button>
-                                    <span>{quantity}</span>
-                                </>
-                            )}
-                            <button type="button" className={quantity > 0 ? 'profile-add-button profile-add-button--icon' : 'profile-add-button'} onClick={onAdd} disabled={out}>
-                                {quantity > 0 ? '+' : messages.add}
-                            </button>
-                        </>
-                    )}
+                <div className="profile-product-purchase">
+                    <strong className="profile-product-price">{amount(product.priceAmount, product.priceCurrency)}</strong>
+                    <div className="profile-product-actions">
+                        {isTraining(product) ? (
+                            <>
+                                <button type="button" className={`profile-add-button${quantity > 0 ? ' profile-add-button--added' : ''}`} onClick={onAdd} disabled={out || quantity > 0}>
+                                    {quantity > 0 ? messages.trainingInCart : messages.add}
+                                </button>
+                                {quantity > 0 && <button type="button" className="training-remove" onClick={onRemove}>{messages.removeTraining}</button>}
+                            </>
+                        ) : (
+                            <>
+                                {quantity > 0 && (
+                                    <>
+                                        <button type="button" className="profile-qty-button" onClick={onRemove} disabled={out} aria-label={messages.decreaseQuantity}>−</button>
+                                        <span>{quantity}</span>
+                                    </>
+                                )}
+                                <button type="button" className={quantity > 0 ? 'profile-add-button profile-add-button--icon' : 'profile-add-button'} onClick={onAdd} disabled={out}>
+                                    {quantity > 0 ? '+' : messages.add}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </article>
