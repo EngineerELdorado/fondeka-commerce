@@ -1,4 +1,5 @@
 import DownloadAppButton from './download-app-button';
+import { MyLearningLink } from './learning-session';
 
 const landingCopy = {
     en: {
@@ -373,6 +374,7 @@ export default async function Home({ searchParams }) {
                     <a href="#faq">{copy.nav.faq}</a>
                 </nav>
                 <div className="landing-nav-actions">
+                    <MyLearningLink language={locale} />
                     <LanguageSwitcher activeLocale={locale} />
                     <DownloadAppButton
                         label={copy.nav.download}

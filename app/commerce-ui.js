@@ -11,6 +11,8 @@ const paths = {
     arrow: <><path d="M4 12h16m-6-6 6 6-6 6" /></>,
     back: <><path d="M20 12H4m6-6-6 6 6 6" /></>,
     chevron: <path d="m7 10 5 5 5-5" />,
+    play: <path d="m9 5 11 7-11 7V5Z" />,
+    refresh: <><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.3 7a7 7 0 0 1 11.6-1L20 9M4 15l2.1 3A7 7 0 0 0 17.7 17" /></>,
     check: <path d="m5 12 4 4L19 6" />,
     close: <path d="m6 6 12 12M6 18 18 6" />,
     card: <><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M3 10h18M7 15h3" /></>,

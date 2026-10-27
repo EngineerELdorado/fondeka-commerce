@@ -1,5 +1,7 @@
 import './globals.css';
 import './commerce-ui.css';
+import './learning.css';
+import { LearningSessionProvider } from './learning-session';
 
 export const metadata = {
     metadataBase: new URL('https://commerce.fondeka.com'),
@@ -64,7 +66,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
     return (
         <html lang="en">
-        <body>{children}</body>
+        <body><LearningSessionProvider>{children}</LearningSessionProvider></body>
         </html>
     );
 }

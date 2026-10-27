@@ -4,12 +4,14 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { apiFetch } from '../../../lib/api';
 import {
     checkoutLineItems, isEligiblePaidOrder, isTraining, productQuantity,
-    shouldPollOrder, storefrontCartItems, trainingOutlinePath, trainingPlayerUrl,
+    shouldPollOrder, storefrontCartItems, trainingOutlinePath, trainingPlayerUrl, trainingAccessUrl,
 } from '../../../lib/commerce-training.mjs';
 import TrainingSyllabus from '../../training-syllabus';
+import ProductMasonry from '../../product-masonry';
 import { CommerceIcon, CommerceImage, DialogBackdrop, DropdownChevron, SocialIcon, StepProgress, StorefrontSkeleton, useCheckoutNavigation } from '../../commerce-ui';
 import { COMMERCE_UI_COPY } from '../../../lib/commerce-ui-copy';
 import COUNTRY_DATA from '../../../src/data/countries';
+import { MyLearningLink, useLearningSession } from '../../learning-session';
 
 const PAGE_SIZE = 20;
 const BUYER_DETAILS_STORAGE_KEY = 'fondeka-commerce-buyer-details';
@@ -851,6 +853,10 @@ function orderFulfillmentItems(order) {
             downloadUrl: isTraining(item) ? '' : String(item.downloadUrl || '').trim(),
             fulfillmentUrl: isTraining(item) ? '' : String(item.fulfillmentUrl || '').trim(),
             trainingPlayerUrl: trainingPlayerUrl(order, item),
+            trainingAccessUrl: trainingAccessUrl(order, item),
+            productId: item.productId,
+            orderReference: order.reference,
+            orderItemId: item.orderItemId ?? item.id,
         }))
         .filter((item) => item.name);
 }
@@ -1044,7 +1050,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [busy, setBusy] = useState(false);
     const [loadError, setLoadError] = useState(initialLoadError);
     const [flowError, setFlowError] = useState(null);
-    const messages = useMemo(() => ({ ...COMMERCE_MESSAGES[normalizeCommerceLanguage(language)], ...COMMERCE_UI_COPY[normalizeCommerceLanguage(language)] }), [language]);
+    const knownStoreSlug = store?.slug || slug || seededProducts[0]?.storeSlug || '';
+    const messages = useMemo(() => ({ ...COMMERCE_MESSAGES[normalizeCommerceLanguage(language)], ...COMMERCE_UI_COPY[normalizeCommerceLanguage(language)], language: normalizeCommerceLanguage(language), storeSlug: knownStoreSlug }), [language, knownStoreSlug]);
     const checkoutNavigation = useCheckoutNavigation({ setOpen: setCheckoutSheetOpen, setReviewOpen: setPaymentReviewOpen, canReview: Boolean(paymentReviewContext?.quote || quote), busy });
     const paymentSubmissionLock = useRef(false);
     const quoteSubmissionLock = useRef(false);
@@ -2042,10 +2049,11 @@ function ProductHero({ product, store, onOpenGallery }) {
 }
 
 function Screen({ children, wide = false }) {
+    const messages = useCommerceMessages();
     return (
         <main className="commerce-page commerce-ui">
             <div className={wide ? 'commerce-shell' : 'commerce-shell commerce-shell--narrow'}>
-                <Brand />
+                <div className="storefront-header"><Brand /><MyLearningLink store={messages.storeSlug} language={messages.language} /></div>
                 {children}
             </div>
         </main>
@@ -2145,7 +2153,7 @@ function StoreProfilePage({
     const tabs = {
         PRODUCTS: (
             products.length ? (
-                <div className="profile-product-grid">
+                <ProductMasonry>
                     {products.map((product) => (
                         <ProfileProductCard
                             key={product.id || product.slug}
@@ -2157,7 +2165,7 @@ function StoreProfilePage({
                             onRemove={() => onProductRemove(product)}
                         />
                     ))}
-                </div>
+                </ProductMasonry>
             ) : (
                 <StateCard title={messages.noProductsTitle} message={messages.noProductsBody} />
             )
@@ -2364,6 +2372,8 @@ function paidFulfillmentItemKey(item) {
 
 function PaidFulfillmentList({ items, onRefresh }) {
     const messages = useCommerceMessages();
+    const { remember } = useLearningSession();
+    useEffect(() => { remember((Array.isArray(items) ? items : []).filter(item => item.type === 'TRAINING' && item.trainingPlayerUrl && item.trainingAccessUrl)); }, [items, remember]);
     const [refreshing, setRefreshing] = useState(false);
     const [refreshError, setRefreshError] = useState(false);
     const fulfillmentItems = (Array.isArray(items) ? items : [])
@@ -2417,6 +2427,7 @@ function PaidFulfillmentList({ items, onRefresh }) {
                                     {onRefresh && <button type="button" className="button secondary" onClick={refreshTraining} disabled={refreshing}>{messages.retry}</button>}
                                 </>
                             )}
+                            {item.trainingPlayerUrl && item.trainingAccessUrl && <MyLearningLink className="paid-learning-link" language={messages.language} store={messages.storeSlug} />}
                         </div>
                     );
                 }

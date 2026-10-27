@@ -1,6 +1,6 @@
 # Public Commerce training: buyer learning experience
 
-Status: frontend implementation handoff. Updated 2026-10-25. This document describes the reference UI implemented in `fondeka-web` and how to adapt it to public Commerce. It does not implement a new public library or player.
+Status: implemented in public Commerce. Updated 2026-10-25. This document retains the `fondeka-web` design and API adaptation reference. The public library, email-code recovery and inline player now live in this repository; see [implementation and deployment](public-learning.md).
 
 ## Product boundary
 
@@ -13,7 +13,7 @@ There are three distinct surfaces:
 | Surface | Content and purpose |
 | --- | --- |
 | Public product page | Marketing media, price and published syllabus titles/types. No paid notes, source URLs or private file details. |
-| Recovered purchases | Trainings authorized by the current limited learner session, with an action to open each exact backend player URL. |
+| Recovered purchases | Trainings authorized by the current limited learner session, opening the Commerce learner view with an exact backend player link available. |
 | Paid learner page | Authorized curriculum, material access and server-saved progress. Access is checked independently of whether the page shell is public. |
 
 ## What was implemented in the Business project
@@ -113,7 +113,7 @@ The reference opener uses a focused dialog with loading, error/retry, an explici
 
 Keep the existing Commerce checkout, quote, payment-method, callback and order polling flow. Pending, failed, partially paid, disputed and refunded orders stay locked. A successful HTTP request/provider redirect does not grant access. Once an eligible paid item returns `trainingPlayerUrl`, **Start training** becomes the primary outcome action.
 
-Use the exact backend `trainingPlayerUrl` and `trainingAccessUrl`. Do not construct or rewrite either URL. The existing responsive backend player can adopt this design; a frontend-owned player requires an explicitly supported backend/public-origin contract. If same-origin delivery needs a proxy/configuration change, request that separately rather than rewriting hosts in the browser.
+Use the exact backend `trainingPlayerUrl` and `trainingAccessUrl`. Do not construct or rewrite either URL. Commerce now uses a narrowly scoped same-origin gateway for the existing guest APIs; its backend-origin allowlist, cookie/CSRF transport and deployment requirements are documented in [the implementation guide](public-learning.md). It never rewrites hosts in the browser.
 
 The existing order-scoped guest endpoints are:
 
