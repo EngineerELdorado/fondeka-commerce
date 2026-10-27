@@ -2532,7 +2532,6 @@ function ProfileProductCard({ product, quantity, onOpen, onPlayVideo, onAdd, onR
             </div>
             <div className="profile-product-body">
                 <button type="button" className="profile-product-name" onClick={onOpen} title={product.name || product.slug || messages.product}>{product.name || product.slug || messages.product}</button>
-                <ProductTypeBadge product={product} />
                 <div className="profile-product-purchase">
                     <strong className="profile-product-price">{amount(product.priceAmount, product.priceCurrency)}</strong>
                     <div className="profile-product-actions">
