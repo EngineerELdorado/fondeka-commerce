@@ -14,6 +14,7 @@ import COUNTRY_DATA from '../../../src/data/countries';
 import { MyLearningLink, useLearningSession } from '../../learning-session';
 import { storeOffersTraining } from '../../../lib/store-training.mjs';
 import { checkoutBuyerFields, internationalPhoneInput, savedBuyerContact } from '../../../lib/commerce-buyer.mjs';
+import { checkoutCurrencies, commerceFeeParams, commercePaymentIdempotencyKey, ensureCommerceOrder, orderMatchesMethodCurrency, paymentAttemptNeedsRecovery, paymentReviewMatchesMethod, recoverCommerceOrder } from '../../../lib/commerce-checkout.mjs';
 
 const PAGE_SIZE = 20;
 const WHATSAPP_DELIVERY_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_WHATSAPP_DELIVERY_ENABLED === 'true';
@@ -67,6 +68,8 @@ const COMMERCE_MESSAGES = {
         retry: 'Retry',
         completePayment: 'Complete payment',
         feesChecked: 'Fees are checked before payment starts.',
+        paymentAlreadyStarted: 'A payment has already been started for this order. Wait for its status to refresh before making another payment.',
+        currencyReviewRequired: 'The payment currency has changed. Review the updated total before paying.',
         orderReference: 'Order reference',
         totalAmount: 'Total amount',
         backToStore: 'Back to store',
@@ -271,6 +274,8 @@ const COMMERCE_MESSAGES = {
         retry: 'Réessayer',
         completePayment: 'Finaliser le paiement',
         feesChecked: 'Les frais sont vérifiés avant le lancement du paiement.',
+        paymentAlreadyStarted: 'Un paiement a déjà été démarré pour cette commande. Attendez la mise à jour de son statut avant d’effectuer un autre paiement.',
+        currencyReviewRequired: 'La devise de paiement a changé. Vérifiez le nouveau total avant de payer.',
         orderReference: 'Référence de commande',
         totalAmount: 'Montant total',
         backToStore: 'Retour à la boutique',
@@ -908,10 +913,8 @@ function commerceAppCheckoutDeepLink(cartItems, currencies) {
     return `${base}/checkout?${params.toString()}`;
 }
 
-function checkoutPayload(cartItems, buyer, currencies) {
-    const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
-    const billingCurrency = cartCurrency || currencies.billingCurrency;
-    const paymentCurrency = cartCurrency || currencies.paymentCurrency || billingCurrency;
+function checkoutPayload(cartItems, buyer, currencies, method) {
+    const { billingCurrency, paymentCurrency } = checkoutCurrencies(cartItems, currencies, method);
 
     return {
         items: checkoutLineItems(cartItems),
@@ -1197,6 +1200,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const selectedBuyerCountry = contactCountry(buyer.phone, COUNTRIES_BY_CODE[buyerCountryCode] || COUNTRIES_BY_CODE.CD);
     const mobileMoneyPhone = paymentPhone ?? (buyer.phone.startsWith(`+${selectedCountry.callingCode}`) ? buyer.phone : '');
     const contactLocked = Boolean(order?.reference && paymentOrderReference === order.reference);
+    const unresolvedPaymentAttempt = paymentAttemptNeedsRecovery(order, paymentOrderReference);
     const filteredCountries = useMemo(() => {
         const query = countryQuery.trim().toLowerCase();
         if (!query) return COUNTRY_OPTIONS;
@@ -1212,9 +1216,15 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     }, [appCheckoutLink]);
 
     const setQuantity = (productId, nextQuantity) => {
+        if (unresolvedPaymentAttempt) {
+            setFlowError({ message: messages.paymentAlreadyStarted, errorCode: 'COMMERCE_PAYMENT_ALREADY_STARTED' });
+            return;
+        }
         const product = products.find((candidate) => String(candidate.id) === String(productId));
         const safeQuantity = productQuantity(product, nextQuantity);
         if (safeQuantity === number(cart[productId])) return;
+        // A deliberate cart change may start another purchase only after the prior attempt is resolved.
+        setPaymentOrderReference(null);
         setCart((current) => {
             const next = { ...current };
             if (safeQuantity > 0) next[productId] = safeQuantity;
@@ -1240,7 +1250,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     };
 
     const updateBuyer = (updater) => {
-        if (contactLocked) return;
+        if (contactLocked || unresolvedPaymentAttempt) return;
         setBuyer(updater);
         setQuote(null);
         setPaymentReviewOpen(false);
@@ -1312,24 +1322,27 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         return null;
     };
 
-    const ensureOrder = async () => {
-        if (order?.reference && order?.accessToken) return order;
-        const createdCheckout = await apiFetch('/public/commerce/checkouts', {
+    const ensureOrder = async (method) => ensureCommerceOrder({
+        order,
+        checkout,
+        payload: checkoutPayload(cartItems, buyer, currencies, method),
+        paymentAttempted: Boolean(paymentOrderReference),
+        paymentAlreadyStartedMessage: messages.paymentAlreadyStarted,
+        getOrder: (existing) => apiFetch(
+            `/public/commerce/orders/${encodeURIComponent(existing.reference)}?accessToken=${encodeURIComponent(existing.accessToken)}`
+        ),
+        createCheckout: (payload) => apiFetch('/public/commerce/checkouts', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept-Language': messages.language },
-            body: JSON.stringify(checkoutPayload(cartItems, buyer, currencies)),
-        });
-        setCheckout({
-            id: createdCheckout.id,
-            accessToken: createdCheckout.accessToken,
-        });
-        const pendingOrder = await apiFetch(
-            `/public/commerce/checkouts/${encodeURIComponent(createdCheckout.id)}/orders?accessToken=${encodeURIComponent(createdCheckout.accessToken || '')}`,
+            body: JSON.stringify(payload),
+        }),
+        createOrder: (draft) => apiFetch(
+            `/public/commerce/checkouts/${encodeURIComponent(draft.id)}/orders?accessToken=${encodeURIComponent(draft.accessToken || '')}`,
             { method: 'POST', headers: { 'Accept-Language': messages.language } }
-        );
-        setOrder(pendingOrder);
-        return pendingOrder;
-    };
+        ),
+        onCheckout: setCheckout,
+        onOrder: setOrder,
+    });
 
     const fetchPaymentMethodsForAmount = useCallback(async ({ amount: methodAmount, currency: methodCurrency }) => {
         const params = new URLSearchParams({
@@ -1365,8 +1378,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     };
 
     const fetchPaymentMethods = useCallback(async (currentOrder) => fetchPaymentMethodsForAmount({
-        amount: currentOrder.paymentAmount ?? currentOrder.billingAmount ?? 0,
-        currency: currentOrder.paymentCurrency || currentOrder.billingCurrency || '',
+        amount: currentOrder.billingAmount ?? currentOrder.paymentAmount ?? 0,
+        currency: currentOrder.billingCurrency || currentOrder.paymentCurrency || '',
     }), [fetchPaymentMethodsForAmount]);
 
     const resolveSelectedPaymentMethod = async (currentOrder) => {
@@ -1379,18 +1392,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     };
 
     const fetchPaymentQuote = async ({ resetCheckout = false } = {}) => {
-        const currentOrder = await ensureOrder();
+        const requestedMethod = paymentMethods.find((method) => method.key === paymentMethod);
+        if (!requestedMethod?.id) throw new Error(messages.noPaymentMethodAvailable);
+        const currentOrder = await ensureOrder(requestedMethod);
         const selectedMethod = await resolveSelectedPaymentMethod(currentOrder);
-        const settlementAmount = currentOrder.billingAmount ?? currentOrder.paymentAmount;
-        const settlementCurrency = currentOrder.billingCurrency || currentOrder.paymentCurrency || currencies.billingCurrency;
-        const displayCurrency = selectedMethod.currency || currentOrder.paymentCurrency || settlementCurrency;
-        const params = new URLSearchParams({
-            action: 'COMMERCE_CHECKOUT_PAYMENT',
-            paymentMethodId: String(selectedMethod.id),
-            amount: String(settlementAmount),
-            currency: String(settlementCurrency || '').trim().toUpperCase(),
-            displayCurrency: String(displayCurrency || '').trim().toUpperCase(),
-        });
+        if (!orderMatchesMethodCurrency(currentOrder, selectedMethod)) throw new Error(messages.currencyReviewRequired);
+        const params = commerceFeeParams(currentOrder, selectedMethod);
         const feeQuote = await apiFetch(`/public/fees?${params.toString()}`);
         const nextQuote = feeQuotePayload(feeQuote, currentOrder, selectedMethod);
         if (resetCheckout) setCheckout(null);
@@ -1472,9 +1479,31 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setBusy(true);
         setFlowError(null);
         try {
-            const quoteResult = paymentReviewContext?.quote && paymentReviewContext?.order && paymentReviewContext?.method
-                ? paymentReviewContext
-                : await fetchPaymentQuote();
+            if (paymentOrderReference) {
+                // A lost/ambiguous response is a status-recovery operation, never another payment POST.
+                const original = [order, paymentReviewContext?.order]
+                    .find((candidate) => candidate?.reference === paymentOrderReference);
+                if (!original) throw new Error(messages.paymentAlreadyStarted);
+                const latest = await recoverCommerceOrder({
+                    order: original,
+                    getOrder: (existing) => apiFetch(
+                        `/public/commerce/orders/${encodeURIComponent(existing.reference)}?accessToken=${encodeURIComponent(existing.accessToken)}`
+                    ),
+                    onOrder: setOrder,
+                });
+                if (paymentAttemptNeedsRecovery(latest, paymentOrderReference)) {
+                    setFlowError({ message: messages.paymentAlreadyStarted, errorCode: 'COMMERCE_PAYMENT_ALREADY_STARTED' });
+                }
+                return;
+            }
+            if (!paymentReviewMatchesMethod(paymentReviewContext, selectedPaymentMethod)) {
+                // A fresh quote always returns to review; it never silently starts a changed payment.
+                const refreshed = await fetchPaymentQuote();
+                setPaymentReviewContext(refreshed);
+                checkoutNavigation.review();
+                return;
+            }
+            const quoteResult = paymentReviewContext;
             const currentOrder = quoteResult.order;
             const paymentQuote = quoteResult.quote;
             const methodForPayment = quoteResult.method;
@@ -1500,7 +1529,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                             networkId,
                             feeApplicationMode: methodForPayment.feeApplicationMode || null,
                         },
-                        idempotencyKey: idempotencyKey(`commerce-${currentOrder.reference}`),
+                        idempotencyKey: commercePaymentIdempotencyKey(currentOrder),
                     }),
                 }
             );
@@ -1852,7 +1881,10 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     <button
                         type="button"
                         className="button secondary"
+                        disabled={unresolvedPaymentAttempt}
                         onClick={() => {
+                            if (unresolvedPaymentAttempt) return;
+                            setPaymentOrderReference(null);
                             setOrder(null);
                             setCheckout(null);
                             setShowOrderPaymentView(false);
