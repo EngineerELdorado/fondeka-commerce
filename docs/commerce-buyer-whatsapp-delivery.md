@@ -2,6 +2,8 @@
 
 Implemented in the public storefront on 2026-10-28. The backend owns message delivery and the private delivery page; this integration uses the existing checkout and payment flow.
 
+For the authenticated Expo flow, see [the mobile adaptation handoff](mobile-authenticated-whatsapp-delivery-handoff.md), including the exact entry points, contact/payer separation and checkout snapshot lifecycle.
+
 ## Buyer experience
 
 - The buyer-contact step presents the English/French WhatsApp choice immediately below the phone field. It explains that the number must include a country calling code and that the choice concerns order delivery, not marketing.
