@@ -268,10 +268,25 @@
 .commerce-ui .checkout-flow-actions .button { min-width: 116px; padding: 0 20px; }
 .commerce-ui .buyer-fields { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; }
 .commerce-ui .commerce-field { display: flex; flex-direction: column; gap: 7px; }
-.commerce-ui .commerce-field > label { font-size: 13px; font-weight: 550; color: var(--secondary); margin: 0; }
+.commerce-ui .commerce-field > label { display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 13px; font-weight: 550; color: var(--secondary); margin: 0; }
 .commerce-ui :is(.commerce-field input, .mobile-money-phone-row input, .country-search-input) { min-height: 48px; border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px; width: 100%; min-width: 0; background: var(--surface); color: var(--ink); box-shadow: inset 0 1px 2px #14233703; font-size: 16px; font-weight: 450; }
 .commerce-ui :is(.commerce-field input, .mobile-money-phone-row input, .country-search-input):focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent); }
 .commerce-ui .commerce-field input[aria-invalid="true"] { border-color: var(--danger); }
+.commerce-ui .commerce-field > label small { font-size: 12px; font-weight: 450; color: var(--muted); }
+.commerce-ui .buyer-contact-help { margin: 0; color: var(--muted); font-size: 13px; font-weight: 400; line-height: 1.5; }
+.commerce-ui .buyer-whatsapp-choice { margin-top: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-raised); transition: border-color 180ms, background 180ms; }
+.commerce-ui .buyer-whatsapp-choice--selected { background: color-mix(in srgb, var(--brand-soft) 55%, var(--surface)); border-color: color-mix(in srgb, var(--brand) 28%, var(--line)); }
+.commerce-ui .buyer-whatsapp-choice > label { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: start; gap: 12px; min-height: 44px; cursor: pointer; }
+.commerce-ui .buyer-whatsapp-choice input { appearance: auto; accent-color: var(--brand); width: 20px; height: 20px; min-height: 20px; margin: 3px 0 0; padding: 0; border-radius: 5px; flex-shrink: 0; }
+.commerce-ui .buyer-whatsapp-choice label > span { color: var(--ink); font-size: 14px; font-weight: 550; line-height: 1.55; }
+.commerce-ui .buyer-whatsapp-choice .whatsapp-icon { display: inline-block; width: 18px; height: 18px; margin: 0 6px 2px 0; vertical-align: middle; color: var(--brand); }
+.commerce-ui .buyer-whatsapp-choice > p { margin: 6px 0 0 34px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.commerce-ui .buyer-whatsapp-summary { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--brand); font-size: 12px; line-height: 1.5; }
+.commerce-ui .buyer-whatsapp-summary .whatsapp-icon { width: 15px; height: 15px; flex-shrink: 0; }
+@media (min-width: 960px) {
+    .commerce-ui .buyer-fields--whatsapp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .commerce-ui .buyer-fields--whatsapp > :nth-child(n + 3) { grid-column: 1 / -1; }
+}
 .commerce-ui .field-error { color: var(--danger); font-size: 12px; line-height: 1.5; }
 .commerce-ui .phone-input-row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px; }
 .commerce-ui .phone-code-button { min-height: 48px; padding: 0 8px 0 10px; border: 1px solid var(--line); border-radius: 13px; color: var(--secondary); background: var(--surface-raised); font-size: 14px; gap: 8px; box-shadow: none; }

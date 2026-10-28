@@ -13,8 +13,10 @@ import { COMMERCE_UI_COPY } from '../../../lib/commerce-ui-copy';
 import COUNTRY_DATA from '../../../src/data/countries';
 import { MyLearningLink, useLearningSession } from '../../learning-session';
 import { storeOffersTraining } from '../../../lib/store-training.mjs';
+import { checkoutBuyerFields, internationalPhoneInput, savedBuyerContact } from '../../../lib/commerce-buyer.mjs';
 
 const PAGE_SIZE = 20;
+const WHATSAPP_DELIVERY_ENABLED = process.env.NEXT_PUBLIC_COMMERCE_WHATSAPP_DELIVERY_ENABLED === 'true';
 const BUYER_DETAILS_STORAGE_KEY = 'fondeka-commerce-buyer-details';
 const MOBILE_BROWSER_RE = /Android|iPhone|iPad|iPod/i;
 const COUNTRY_OPTIONS = COUNTRY_DATA
@@ -737,7 +739,7 @@ function groupedPaymentMethods(methods) {
 }
 
 function hasBuyerDetails(buyer) {
-    return !!(buyer?.name?.trim() && buyer?.email?.trim() && buyer?.phone?.trim());
+    return !!(buyer?.name?.trim() && buyer?.phone?.trim());
 }
 
 function readStoredBuyerDetails() {
@@ -746,11 +748,7 @@ function readStoredBuyerDetails() {
         const raw = window.localStorage.getItem(BUYER_DETAILS_STORAGE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        return {
-            name: String(parsed?.name || ''),
-            email: String(parsed?.email || ''),
-            phone: String(parsed?.phone || ''),
-        };
+        return savedBuyerContact(parsed);
     } catch {
         return null;
     }
@@ -763,11 +761,7 @@ function storeBuyerDetails(buyer) {
             window.localStorage.removeItem(BUYER_DETAILS_STORAGE_KEY);
             return;
         }
-        window.localStorage.setItem(BUYER_DETAILS_STORAGE_KEY, JSON.stringify({
-            name: String(buyer?.name || ''),
-            email: String(buyer?.email || ''),
-            phone: String(buyer?.phone || ''),
-        }));
+        window.localStorage.setItem(BUYER_DETAILS_STORAGE_KEY, JSON.stringify(savedBuyerContact(buyer)));
     } catch {
         // Local storage can be unavailable in private browsing or blocked contexts.
     }
@@ -780,6 +774,9 @@ function phoneDigits(value) {
 function nationalPhoneNumber(phone, country) {
     let digits = phoneDigits(phone);
     if (!digits) return '';
+    const text = String(phone || '').trim();
+    if (!text.startsWith('+') && !text.startsWith('00')) return digits;
+    if (text.startsWith('00')) digits = digits.slice(2);
 
     const selectedCallingCode = String(country?.callingCode || '').trim();
     if (selectedCallingCode && digits.startsWith(selectedCallingCode)) {
@@ -796,9 +793,16 @@ function nationalPhoneNumber(phone, country) {
 }
 
 function combinePhoneNumber(country, localDigits) {
-    const digits = phoneDigits(localDigits);
-    const callingCode = String(country?.callingCode || '243').trim();
-    return digits ? `+${callingCode}${digits}` : '';
+    return internationalPhoneInput(localDigits, country?.callingCode);
+}
+
+function contactCountry(phone, fallback) {
+    const text = String(phone || '').trim();
+    if (!text.startsWith('+') && !text.startsWith('00')) return fallback;
+    const digits = phoneDigits(text.startsWith('00') ? text.slice(2) : text);
+    if (fallback?.callingCode && digits.startsWith(fallback.callingCode)) return fallback;
+    return COUNTRY_OPTIONS.slice().sort((a, b) => b.callingCode.length - a.callingCode.length)
+        .find((country) => digits.startsWith(country.callingCode)) || fallback;
 }
 
 function inventoryLabel(product, messages = COMMERCE_MESSAGES.en) {
@@ -914,9 +918,7 @@ function checkoutPayload(cartItems, buyer, currencies) {
         billingCurrency: billingCurrency.trim().toUpperCase(),
         paymentCurrency: paymentCurrency.trim().toUpperCase(),
         channel: 'STOREFRONT',
-        buyerName: buyer.name.trim(),
-        buyerEmail: buyer.email.trim(),
-        buyerPhone: buyer.phone.trim(),
+        ...checkoutBuyerFields(buyer, WHATSAPP_DELIVERY_ENABLED),
     };
 }
 
@@ -1013,7 +1015,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [publicCatalog, setPublicCatalog] = useState(null);
     const [catalogTraining, setCatalogTraining] = useState(null);
     const [cart, setCart] = useState(initialCart || {});
-    const [buyer, setBuyer] = useState({ name: '', email: '', phone: '' });
+    const [buyer, setBuyer] = useState({ name: '', email: '', phone: '', whatsappDeliveryOptIn: true });
+    const [paymentPhone, setPaymentPhone] = useState(null);
     const [buyerDetailsLoaded, setBuyerDetailsLoaded] = useState(false);
     const [buyerDetailsOpen, setBuyerDetailsOpen] = useState(true);
     const seededCurrency = firstCurrency(seededProducts);
@@ -1032,6 +1035,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [paymentPrompt, setPaymentPrompt] = useState(null);
     const [checkout, setCheckout] = useState(null);
     const [order, setOrder] = useState(null);
+    const [paymentOrderReference, setPaymentOrderReference] = useState(null);
     const [showOrderPaymentView, setShowOrderPaymentView] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('');
     const [discoveredPaymentMethods, setDiscoveredPaymentMethods] = useState([]);
@@ -1046,6 +1050,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [isMobileBrowser, setIsMobileBrowser] = useState(false);
     const [showAppInstallFallback, setShowAppInstallFallback] = useState(false);
     const [countryCode, setCountryCode] = useState(() => normalizeCountryCode(initialCountry));
+    const [buyerCountryCode, setBuyerCountryCode] = useState(() => normalizeCountryCode(initialCountry));
+    const [countryPickerTarget, setCountryPickerTarget] = useState('PAYMENT');
     const [showCountryPicker, setShowCountryPicker] = useState(false);
     const [countryQuery, setCountryQuery] = useState('');
     const [userSelectedCountry, setUserSelectedCountry] = useState(false);
@@ -1188,6 +1194,9 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const paymentMethods = discoveredPaymentMethods;
     const selectedPaymentMethod = paymentMethods.find((method) => method.key === paymentMethod) || null;
     const selectedCountry = COUNTRIES_BY_CODE[countryCode] || COUNTRIES_BY_CODE.CD;
+    const selectedBuyerCountry = contactCountry(buyer.phone, COUNTRIES_BY_CODE[buyerCountryCode] || COUNTRIES_BY_CODE.CD);
+    const mobileMoneyPhone = paymentPhone ?? (buyer.phone.startsWith(`+${selectedCountry.callingCode}`) ? buyer.phone : '');
+    const contactLocked = Boolean(order?.reference && paymentOrderReference === order.reference);
     const filteredCountries = useMemo(() => {
         const query = countryQuery.trim().toLowerCase();
         if (!query) return COUNTRY_OPTIONS;
@@ -1231,14 +1240,33 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     };
 
     const updateBuyer = (updater) => {
+        if (contactLocked) return;
         setBuyer(updater);
         setQuote(null);
         setPaymentReviewOpen(false);
         setPaymentReviewContext(null);
         setPaymentPrompt(null);
         setCheckout(null);
+        // A pending order snapshots the contact and choice. A later review must
+        // create a fresh order after edits, before any payment has been started.
+        setOrder(null);
         setShowOrderPaymentView(false);
         setFlowError(null);
+    };
+
+    const updatePaymentPhone = (value) => {
+        setPaymentPhone(value);
+        setQuote(null);
+        setPaymentReviewOpen(false);
+        setPaymentReviewContext(null);
+        setPaymentPrompt(null);
+        setFlowError(null);
+    };
+
+    const openCountryPicker = (target = 'PAYMENT') => {
+        setCountryPickerTarget(target);
+        setCountryQuery('');
+        setShowCountryPicker(true);
     };
 
     const updatePaymentMethod = (methodKey) => {
@@ -1273,14 +1301,13 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const validate = () => {
         if (!cartItems.length) return messages.chooseAtLeastOneProduct;
         if (!buyer.name.trim()) return messages.buyerNameRequired;
-        if (!buyer.email.trim()) return messages.buyerEmailRequired;
         if (!buyer.phone.trim()) return messages.buyerPhoneRequired;
         const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
         if (!cartCurrency && !currencies.billingCurrency.trim()) return messages.billingCurrencyRequired;
         if (!cartCurrency && !currencies.paymentCurrency.trim()) return messages.paymentCurrencyRequired;
         const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
         if (!selectedMethod?.id) return interpolate(messages.methodNotConfigured, { method: selectedMethod?.name || messages.paymentMethod });
-        if (selectedMethod.type === 'MOBILE_MONEY' && !buyer.phone.trim()) return messages.mobileMoneyPhoneRequired;
+        if (selectedMethod.type === 'MOBILE_MONEY' && !mobileMoneyPhone.trim()) return messages.mobileMoneyPhoneRequired;
         if (selectedMethod.type === 'CRYPTO' && !selectedCryptoNetworkId) return messages.chooseCryptoNetwork;
         return null;
     };
@@ -1289,7 +1316,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         if (order?.reference && order?.accessToken) return order;
         const createdCheckout = await apiFetch('/public/commerce/checkouts', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Accept-Language': messages.language },
             body: JSON.stringify(checkoutPayload(cartItems, buyer, currencies)),
         });
         setCheckout({
@@ -1298,7 +1325,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         });
         const pendingOrder = await apiFetch(
             `/public/commerce/checkouts/${encodeURIComponent(createdCheckout.id)}/orders?accessToken=${encodeURIComponent(createdCheckout.accessToken || '')}`,
-            { method: 'POST' }
+            { method: 'POST', headers: { 'Accept-Language': messages.language } }
         );
         setOrder(pendingOrder);
         return pendingOrder;
@@ -1408,7 +1435,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         if (methodForPayment.type === 'MOBILE_MONEY' && actionable) {
             setPaymentPrompt({
                 type: 'MOBILE_MONEY',
-                number: buyer.phone,
+                number: mobileMoneyPhone,
                 hint: nextAction?.urlOrHint || nextAction?.message || '',
             });
             return;
@@ -1451,13 +1478,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             const currentOrder = quoteResult.order;
             const paymentQuote = quoteResult.quote;
             const methodForPayment = quoteResult.method;
-            const accountNumber = methodForPayment.type === 'MOBILE_MONEY' ? buyer.phone.trim() : null;
+            const accountNumber = methodForPayment.type === 'MOBILE_MONEY' ? mobileMoneyPhone.trim() : null;
             const networkId = methodForPayment.type === 'CRYPTO' ? selectedCryptoNetworkId : (methodForPayment.networkId || null);
+            setPaymentOrderReference(currentOrder.reference);
             const paidOrder = await apiFetch(
                 `/public/commerce/orders/${encodeURIComponent(currentOrder.reference)}/payments/start?accessToken=${encodeURIComponent(currentOrder.accessToken || '')}`,
                 {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Accept-Language': messages.language },
                     body: JSON.stringify({
                         paymentMethodId: methodForPayment.id,
                         accountNumber,
@@ -1681,18 +1709,23 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             open={showCountryPicker}
             countries={filteredCountries}
             query={countryQuery}
-            selectedCode={countryCode}
+            selectedCode={countryPickerTarget === 'BUYER' ? selectedBuyerCountry.code : countryCode}
             onQueryChange={setCountryQuery}
             onClose={() => setShowCountryPicker(false)}
             onSelect={(country) => {
+                if (countryPickerTarget === 'BUYER') {
+                    const localDigits = nationalPhoneNumber(buyer.phone, selectedBuyerCountry);
+                    updateBuyer((current) => ({ ...current, phone: localDigits ? combinePhoneNumber(country, localDigits) : '' }));
+                    setBuyerCountryCode(country.code);
+                    setShowCountryPicker(false);
+                    return;
+                }
+                if (country.code === countryCode) {
+                    setShowCountryPicker(false);
+                    return;
+                }
                 setUserSelectedCountry(true);
-                setBuyer((current) => {
-                    const localDigits = nationalPhoneNumber(current.phone, selectedCountry);
-                    return {
-                        ...current,
-                        phone: localDigits ? combinePhoneNumber(country, localDigits) : current.phone,
-                    };
-                });
+                setPaymentPhone('');
                 setCountryCode(country.code);
                 setShowCountryPicker(false);
                 setQuote(null);
@@ -1718,12 +1751,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             network={selectedPaymentMethod?.type === 'CRYPTO'
                 ? cryptoNetworks.find((network) => network.id === selectedCryptoNetworkId)
                 : null}
-            account={selectedPaymentMethod?.type === 'MOBILE_MONEY' ? buyer.phone : null}
+            account={selectedPaymentMethod?.type === 'MOBILE_MONEY' ? mobileMoneyPhone : null}
             busy={busy}
             error={flowError}
             onClose={checkoutNavigation.closeReview}
             buyer={buyer}
-            onEditBuyer={checkoutSheetOpen ? () => checkoutNavigation.go(1) : undefined}
+            onEditBuyer={checkoutSheetOpen && !contactLocked ? () => checkoutNavigation.go(1) : undefined}
             onConfirm={confirmPayment}
         />
     ) : null;
@@ -1784,8 +1817,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     {expectedTrainingIds.length > 0 && !isOrderPaid(order) && <p role="status">{messages.trainingAccessInactive}</p>}
                     <OrderPaymentPanel
                         order={order}
-                        buyer={buyer}
-                        setBuyer={updateBuyer}
+                        paymentPhone={mobileMoneyPhone}
+                        setPaymentPhone={updatePaymentPhone}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={updatePaymentMethod}
                         paymentMethods={paymentMethods}
@@ -1800,10 +1833,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         selectedCryptoNetworkId={selectedCryptoNetworkId}
                         setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
-                        onOpenCountryPicker={() => {
-                            setCountryQuery('');
-                            setShowCountryPicker(true);
-                        }}
+                        onOpenCountryPicker={() => openCountryPicker('PAYMENT')}
                         quote={quote}
                         checkout={checkout}
                         flowError={flowError}
@@ -1868,6 +1898,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         navigation={checkoutNavigation}
                         buyer={buyer}
                         setBuyer={updateBuyer}
+                        paymentPhone={mobileMoneyPhone}
+                        setPaymentPhone={updatePaymentPhone}
                         currencies={currencies}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={updatePaymentMethod}
@@ -1883,12 +1915,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         selectedCryptoNetworkId={selectedCryptoNetworkId}
                         setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
+                        buyerCountry={selectedBuyerCountry}
+                        onOpenBuyerCountryPicker={() => openCountryPicker('BUYER')}
+                        contactLocked={contactLocked}
                         buyerDetailsOpen={buyerDetailsOpen}
                         setBuyerDetailsOpen={setBuyerDetailsOpen}
-                        onOpenCountryPicker={() => {
-                            setCountryQuery('');
-                            setShowCountryPicker(true);
-                        }}
+                        onOpenCountryPicker={() => openCountryPicker('PAYMENT')}
                         quote={quote}
                         checkout={checkout}
                         flowError={flowError}
@@ -1964,6 +1996,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         navigation={checkoutNavigation}
                         buyer={buyer}
                         setBuyer={updateBuyer}
+                        paymentPhone={mobileMoneyPhone}
+                        setPaymentPhone={updatePaymentPhone}
                         currencies={currencies}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={updatePaymentMethod}
@@ -1979,12 +2013,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         selectedCryptoNetworkId={selectedCryptoNetworkId}
                         setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
                         selectedCountry={selectedCountry}
+                        buyerCountry={selectedBuyerCountry}
+                        onOpenBuyerCountryPicker={() => openCountryPicker('BUYER')}
+                        contactLocked={contactLocked}
                         buyerDetailsOpen={buyerDetailsOpen}
                         setBuyerDetailsOpen={setBuyerDetailsOpen}
-                        onOpenCountryPicker={() => {
-                            setCountryQuery('');
-                            setShowCountryPicker(true);
-                        }}
+                        onOpenCountryPicker={() => openCountryPicker('PAYMENT')}
                         quote={quote}
                         checkout={checkout}
                         flowError={flowError}
@@ -2775,10 +2809,10 @@ function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker, er
     const localPhone = nationalPhoneNumber(buyer.phone, selectedCountry);
     const fieldProps = (key) => ({ id: `${prefix}-${key}`, 'aria-invalid': Boolean(errors[key]), 'aria-describedby': errors[key] ? `${prefix}-${key}-error` : undefined, disabled });
     return (
-        <div className="buyer-fields" onKeyDown={(event) => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.target.tagName !== 'INPUT') return;
+        <div className={`buyer-fields${WHATSAPP_DELIVERY_ENABLED ? ' buyer-fields--whatsapp' : ''}`} onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.target.tagName !== 'INPUT' || event.target.type === 'checkbox') return;
             event.preventDefault();
-            const inputs = [...event.currentTarget.querySelectorAll('input:not(:disabled)')];
+            const inputs = [...event.currentTarget.querySelectorAll('input:not(:disabled):not([type="checkbox"])')];
             const next = inputs[inputs.indexOf(event.target) + 1];
             if (next) next.focus({ preventScroll: true });
             else event.target.blur();
@@ -2789,7 +2823,7 @@ function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker, er
                 {errors.name && <span className="field-error" id={`${prefix}-name-error`}>{errors.name}</span>}
             </div>
             <div className="commerce-field">
-                <label htmlFor={`${prefix}-email`}>{messages.email}</label>
+                <label htmlFor={`${prefix}-email`}>{messages.email} <small>({messages.optional})</small></label>
                 <input {...fieldProps('email')} type="email" autoComplete="email" enterKeyHint="next" autoCapitalize="none" spellCheck={false} value={buyer.email} onChange={(event) => update('email', event.target.value)} placeholder="buyer@example.com" inputMode="email" />
                 {errors.email && <span className="field-error" id={`${prefix}-email-error`}>{errors.email}</span>}
             </div>
@@ -2801,12 +2835,27 @@ function BuyerFields({ buyer, setBuyer, selectedCountry, onOpenCountryPicker, er
                         <strong>+{selectedCountry?.callingCode || '243'}</strong>
                         <DropdownChevron />
                     </button>
-                    <input {...fieldProps('phone')} type="tel" autoComplete="tel-national" enterKeyHint="done" value={localPhone} onChange={(event) => update('phone', combinePhoneNumber(selectedCountry, event.target.value))} placeholder="997371767" inputMode="tel" />
+                    <input {...fieldProps('phone')} aria-describedby={errors.phone ? `${prefix}-phone-error` : `${prefix}-phone-help`} type="tel" autoComplete="tel-national" enterKeyHint="done" value={localPhone} onChange={(event) => update('phone', combinePhoneNumber(selectedCountry, event.target.value))} placeholder="997371767" inputMode="tel" />
                 </div>
+                <small className="buyer-contact-help" id={`${prefix}-phone-help`}>{messages.buyerPhoneHelp}</small>
                 {errors.phone && <span className="field-error" id={`${prefix}-phone-error`}>{errors.phone}</span>}
             </div>
+            {WHATSAPP_DELIVERY_ENABLED && (
+                <div className={`buyer-whatsapp-choice${buyer.whatsappDeliveryOptIn ? ' buyer-whatsapp-choice--selected' : ''}`}>
+                    <label htmlFor={`${prefix}-whatsapp`}>
+                        <input id={`${prefix}-whatsapp`} type="checkbox" checked={buyer.whatsappDeliveryOptIn ?? true} onChange={(event) => update('whatsappDeliveryOptIn', event.target.checked)} disabled={disabled} aria-describedby={`${prefix}-whatsapp-help`} />
+                        <span><WhatsAppIcon />{messages.whatsappDeliveryChoice}</span>
+                    </label>
+                    <p id={`${prefix}-whatsapp-help`}>{messages.whatsappDeliveryHelp}</p>
+                </div>
+            )}
         </div>
     );
+}
+
+function BuyerContactSummary({ buyer }) {
+    const messages = useCommerceMessages();
+    return <div><strong>{buyer.name}</strong><span>{buyer.phone}</span>{buyer.email && <span>{buyer.email}</span>}{WHATSAPP_DELIVERY_ENABLED && buyer.whatsappDeliveryOptIn && <small className="buyer-whatsapp-summary"><WhatsAppIcon />{messages.whatsappDeliverySelected}</small>}</div>;
 }
 
 function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, onOpenCountryPicker }) {
@@ -2846,10 +2895,10 @@ function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, 
 }
 
 function CheckoutPaymentForm({
-    cartItems, navigation, buyer, setBuyer, paymentMethod, setPaymentMethod, onRetryPaymentMethods, onRetryNetworks,
+    cartItems, navigation, buyer, setBuyer, paymentPhone, setPaymentPhone, paymentMethod, setPaymentMethod, onRetryPaymentMethods, onRetryNetworks,
     paymentMethods, paymentMethodsLoading, paymentMethodsError, paymentMethodsLoaded,
     cryptoNetworks, cryptoNetworksLoading, cryptoNetworksError, selectedCryptoNetworkId,
-    setSelectedCryptoNetworkId, selectedCountry, onOpenCountryPicker, flowError, busy,
+    setSelectedCryptoNetworkId, selectedCountry, onOpenCountryPicker, buyerCountry, onOpenBuyerCountryPicker, contactLocked, flowError, busy,
     appCheckoutLink, showAppCheckout, showAppInstallFallback, onOpenAppCheckout, onConfirm,
 }) {
     const messages = useCommerceMessages();
@@ -2859,7 +2908,6 @@ function CheckoutPaymentForm({
     const heading = useRef(null);
     const errors = attempted === 1 ? {
         ...(!buyer.name.trim() ? { name: messages.buyerNameRequired } : {}),
-        ...(!buyer.email.trim() ? { email: messages.buyerEmailRequired } : {}),
         ...(!buyer.phone.trim() ? { phone: messages.buyerPhoneRequired } : {}),
     } : {};
     const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
@@ -2879,7 +2927,7 @@ function CheckoutPaymentForm({
         if (busy) return;
         setAttempted(step);
         if (step === 0 && !cartItems.length) return;
-        if (step === 1 && (!buyer.name.trim() || !buyer.email.trim() || !buyer.phone.trim())) {
+        if (step === 1 && (!buyer.name.trim() || !buyer.phone.trim())) {
             requestAnimationFrame(() => panel.current?.querySelector('[aria-invalid="true"]')?.focus({ preventScroll: true }));
             return;
         }
@@ -2918,12 +2966,12 @@ function CheckoutPaymentForm({
                             {!cartItems.length && <p className="muted">{messages.chooseProducts}</p>}
                         </div>
                     )}
-                    {step === 1 && <BuyerFields buyer={buyer} setBuyer={setBuyer} selectedCountry={selectedCountry} onOpenCountryPicker={onOpenCountryPicker} errors={errors} disabled={busy} />}
+                    {step === 1 && <><BuyerFields buyer={buyer} setBuyer={setBuyer} selectedCountry={buyerCountry} onOpenCountryPicker={onOpenBuyerCountryPicker} errors={errors} disabled={busy || contactLocked} />{contactLocked && <p className="buyer-contact-help">{messages.contactLocked}</p>}</>}
                     {step === 2 && (
                         <>
-                            <div className="checkout-contact-review"><div><strong>{buyer.name}</strong><span>{buyer.email}</span></div><button type="button" className="commerce-text-button" onClick={() => navigation.go(1)} disabled={busy}>{messages.edit}</button></div>
+                            <div className="checkout-contact-review"><BuyerContactSummary buyer={buyer} /><button type="button" className="commerce-text-button" onClick={() => navigation.go(1)} disabled={busy || contactLocked} title={contactLocked ? messages.contactLocked : undefined}>{messages.edit}</button></div>
                             <PaymentMethodPicker
-                                paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} buyer={buyer} setBuyer={setBuyer}
+                                paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paymentPhone={paymentPhone} setPaymentPhone={setPaymentPhone}
                                 methods={paymentMethods} loading={paymentMethodsLoading} error={paymentMethodsError} loaded={paymentMethodsLoaded} onRetry={onRetryPaymentMethods} onRetryNetworks={onRetryNetworks}
                                 cryptoNetworks={cryptoNetworks} cryptoNetworksLoading={cryptoNetworksLoading} cryptoNetworksError={cryptoNetworksError}
                                 selectedCryptoNetworkId={selectedCryptoNetworkId} setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
@@ -2959,8 +3007,8 @@ function CheckoutPaymentForm({
 
 function OrderPaymentPanel({
     order,
-    buyer,
-    setBuyer,
+    paymentPhone,
+    setPaymentPhone,
     paymentMethod,
     setPaymentMethod,
     paymentMethods,
@@ -3018,8 +3066,8 @@ function OrderPaymentPanel({
                 <PaymentMethodPicker
                     paymentMethod={paymentMethod}
                     setPaymentMethod={setPaymentMethod}
-                    buyer={buyer}
-                    setBuyer={setBuyer}
+                    paymentPhone={paymentPhone}
+                    setPaymentPhone={setPaymentPhone}
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
                     error={paymentMethodsError}
@@ -3093,8 +3141,8 @@ function FondekaAppPaymentPanel({ appCheckoutLink, disabled, showInstallFallback
 function PaymentMethodPicker({
     paymentMethod,
     setPaymentMethod,
-    buyer,
-    setBuyer,
+    paymentPhone,
+    setPaymentPhone,
     methods,
     loading,
     error,
@@ -3141,11 +3189,7 @@ function PaymentMethodPicker({
         setExpanded({ [type]: true });
     };
     const updatePaymentPhone = (digits) => {
-        if (!setBuyer) return;
-        setBuyer((current) => ({
-            ...current,
-            phone: combinePhoneNumber(selectedCountry, digits),
-        }));
+        setPaymentPhone?.(combinePhoneNumber(selectedCountry, digits));
     };
 
     return (
@@ -3220,7 +3264,7 @@ function PaymentMethodPicker({
                                     )}
                                     {type === 'MOBILE_MONEY' && grouped[type].some((method) => method.key === paymentMethod) && (
                                         <MobileMoneyPhoneSelector
-                                            buyer={buyer}
+                                            phone={paymentPhone}
                                             selectedCountry={selectedCountry}
                                             onChangeDigits={updatePaymentPhone}
                                             disabled={disabled}
@@ -3251,10 +3295,10 @@ function PaymentMethodPicker({
     );
 }
 
-function MobileMoneyPhoneSelector({ buyer, selectedCountry, onChangeDigits, disabled }) {
+function MobileMoneyPhoneSelector({ phone, selectedCountry, onChangeDigits, disabled }) {
     const messages = useCommerceMessages();
     const phoneId = useId();
-    const localPhone = nationalPhoneNumber(buyer?.phone, selectedCountry);
+    const localPhone = nationalPhoneNumber(phone, selectedCountry);
 
     return (
         <div className="mobile-money-phone-panel">
@@ -3462,7 +3506,7 @@ function PaymentReviewSheet({ quote, method, network, account, buyer, onEditBuye
                 <StepProgress step={3} labels={messages.checkoutSteps} text={interpolate(messages.stepOf, { step: 4, total: 4 })} />
                 <div className="payment-review-scroll commerce-scroll-region" role="region" aria-label={messages.reviewPayment} tabIndex={0}>
                 <div className="review-identity"><span className="commerce-icon-tile"><CommerceIcon name="shield" size={26} /></span><p>{messages.reviewHelper}</p></div>
-                {buyer && <div className="checkout-contact-review"><div><strong>{buyer.name}</strong><span>{buyer.email}</span></div>{onEditBuyer && <button type="button" className="commerce-text-button" onClick={onEditBuyer} disabled={busy}>{messages.edit}</button>}</div>}
+                {buyer && <div className="checkout-contact-review"><BuyerContactSummary buyer={buyer} />{onEditBuyer && <button type="button" className="commerce-text-button" onClick={onEditBuyer} disabled={busy}>{messages.edit}</button>}</div>}
                 <div className="payment-review-summary">
 	                    <ReviewSummaryLine label={messages.checkoutAmount} value={amount(netAmount, netCurrency)} />
 	                    <ReviewSummaryLine label={messages.fees} value={fees != null ? amount(fees, feeCurrency) : '-'} />
