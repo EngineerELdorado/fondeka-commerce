@@ -12,5 +12,5 @@ export async function generateMetadata({ params }) {
 export default async function Page({ params }) {
     const resolvedParams = await params;
     const hdr = await headers();
-    return <Storefront productLookup={resolvedParams.lookup} initialCountry={countryFromHeaders(hdr)} />;
+    return <Storefront productLookup={resolvedParams.lookup} initialCountry={countryFromHeaders(hdr)} detectedDeliveryCountry={countryFromHeaders(hdr, '')} />;
 }

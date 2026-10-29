@@ -26,6 +26,7 @@ export default async function Page({ params }) {
     const resolvedParams = await params;
     const hdr = await headers();
     const initialCountry = countryFromHeaders(hdr);
+    const detectedDeliveryCountry = countryFromHeaders(hdr, '');
     try {
         const product = await apiFetch(
             `/public/commerce/stores/${encodeURIComponent(resolvedParams.slug)}/products/${encodeURIComponent(resolvedParams.productSlug)}`
@@ -46,6 +47,7 @@ export default async function Page({ params }) {
                 initialProducts={product ? [product] : []}
                 initialCart={product?.id ? { [product.id]: 1 } : {}}
                 initialCountry={initialCountry}
+                detectedDeliveryCountry={detectedDeliveryCountry}
             />
         );
     } catch (error) {
@@ -55,6 +57,7 @@ export default async function Page({ params }) {
                 productSlug={resolvedParams.productSlug}
                 initialLoadError={readError(error)}
                 initialCountry={initialCountry}
+                detectedDeliveryCountry={detectedDeliveryCountry}
             />
         );
     }

@@ -15,5 +15,5 @@ export async function generateMetadata({ params }) {
 export default async function Page({ params }) {
     const resolvedParams = await params;
     const hdr = await headers();
-    return <Storefront slug={resolvedParams.slug} initialCountry={countryFromHeaders(hdr)} />;
+    return <Storefront slug={resolvedParams.slug} initialCountry={countryFromHeaders(hdr)} detectedDeliveryCountry={countryFromHeaders(hdr, '')} />;
 }

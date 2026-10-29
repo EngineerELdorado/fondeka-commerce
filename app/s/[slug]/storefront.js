@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/api';
 import {
     checkoutLineItems, isEligiblePaidOrder, isTraining, productQuantity,
@@ -14,6 +14,11 @@ import COUNTRY_DATA from '../../../src/data/countries';
 import { MyLearningLink, useLearningSession } from '../../learning-session';
 import { storeOffersTraining } from '../../../lib/store-training.mjs';
 import { checkoutBuyerFields, internationalPhoneInput, savedBuyerContact } from '../../../lib/commerce-buyer.mjs';
+import DeliveryAddressFields, { DeliveryAddressSummary } from '../../delivery-address';
+import {
+    emptyDeliveryAddress, normalizeDeliveryAddress, deliveryAddressErrors, deliveryCountrySuggestion, hasPhysicalProducts,
+    readSavedDeliveryAddress, saveDeliveryAddress, forgetDeliveryAddress,
+} from '../../../lib/commerce-delivery.mjs';
 import { checkoutCurrencies, commerceFeeParams, commercePaymentIdempotencyKey, ensureCommerceOrder, orderMatchesMethodCurrency, paymentAttemptNeedsRecovery, paymentReviewMatchesMethod, recoverCommerceOrder } from '../../../lib/commerce-checkout.mjs';
 
 const PAGE_SIZE = 20;
@@ -747,6 +752,11 @@ function hasBuyerDetails(buyer) {
     return !!(buyer?.name?.trim() && buyer?.phone?.trim());
 }
 
+function deliveryStorage() {
+    try { return typeof window === 'undefined' ? null : window.localStorage; }
+    catch { return null; }
+}
+
 function readStoredBuyerDetails() {
     if (typeof window === 'undefined') return null;
     try {
@@ -913,7 +923,7 @@ function commerceAppCheckoutDeepLink(cartItems, currencies) {
     return `${base}/checkout?${params.toString()}`;
 }
 
-function checkoutPayload(cartItems, buyer, currencies, method) {
+function checkoutPayload(cartItems, buyer, currencies, method, deliveryAddress = null) {
     const { billingCurrency, paymentCurrency } = checkoutCurrencies(cartItems, currencies, method);
 
     return {
@@ -922,6 +932,7 @@ function checkoutPayload(cartItems, buyer, currencies, method) {
         paymentCurrency: paymentCurrency.trim().toUpperCase(),
         channel: 'STOREFRONT',
         ...checkoutBuyerFields(buyer, WHATSAPP_DELIVERY_ENABLED),
+        ...(deliveryAddress ? { deliveryAddress: normalizeDeliveryAddress(deliveryAddress) } : {}),
     };
 }
 
@@ -1009,7 +1020,7 @@ function feeQuotePayload(feeQuote, order, paymentMethod) {
     };
 }
 
-export default function Storefront({ slug, productLookup, productSlug, initialStore = null, initialProducts = null, initialCart = null, initialLoadError = null, initialCountry = 'CD' }) {
+export default function Storefront({ slug, productLookup, productSlug, initialStore = null, initialProducts = null, initialCart = null, initialLoadError = null, initialCountry = 'CD', detectedDeliveryCountry = '' }) {
     const seededProducts = Array.isArray(initialProducts) ? initialProducts : [];
     const hasInitialState = !!initialStore || seededProducts.length > 0 || !!initialLoadError;
     const [language, setLanguage] = useState('en');
@@ -1019,6 +1030,14 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const [catalogTraining, setCatalogTraining] = useState(null);
     const [cart, setCart] = useState(initialCart || {});
     const [buyer, setBuyer] = useState({ name: '', email: '', phone: '', whatsappDeliveryOptIn: true });
+    const [deliveryAddress, setDeliveryAddress] = useState(() => ({
+        ...emptyDeliveryAddress(), countryCode: deliveryCountrySuggestion(detectedDeliveryCountry),
+    }));
+    const [savedDeliveryAddress, setSavedDeliveryAddress] = useState(null);
+    const [rememberDeliveryAddress, setRememberDeliveryAddress] = useState(true);
+    const [addressSaveError, setAddressSaveError] = useState(false);
+    const [deliveryRedirect, setDeliveryRedirect] = useState(false);
+    const [serverDeliveryRequirement, setServerDeliveryRequirement] = useState(null);
     const [paymentPhone, setPaymentPhone] = useState(null);
     const [buyerDetailsLoaded, setBuyerDetailsLoaded] = useState(false);
     const [buyerDetailsOpen, setBuyerDetailsOpen] = useState(true);
@@ -1066,7 +1085,15 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const loadedTraining = products.some(isTraining);
     const showMyLearning = !loading && !loadError && (loadedTraining || (catalogTraining?.storeSlug === knownStoreSlug && catalogTraining.available));
     const messages = useMemo(() => ({ ...COMMERCE_MESSAGES[normalizeCommerceLanguage(language)], ...COMMERCE_UI_COPY[normalizeCommerceLanguage(language)], language: normalizeCommerceLanguage(language), storeSlug: knownStoreSlug, showMyLearning }), [language, knownStoreSlug, showMyLearning]);
-    const checkoutNavigation = useCheckoutNavigation({ setOpen: setCheckoutSheetOpen, setReviewOpen: setPaymentReviewOpen, canReview: Boolean(paymentReviewContext?.quote || quote), busy });
+    const cartItems = useMemo(() => storefrontCartItems(products, cart), [cart, products]);
+    const deliveryCartKey = cartItems.map(({ product, quantity }) => `${product.id}:${quantity}`).join('|');
+    const deliveryRequired = hasPhysicalProducts(cartItems) || checkout?.deliveryAddressRequired === true || order?.deliveryAddressRequired === true
+        || (serverDeliveryRequirement?.cartKey === deliveryCartKey && serverDeliveryRequirement.required);
+    const paymentStep = deliveryRequired ? 3 : 2;
+    const checkoutLabels = deliveryRequired
+        ? [...messages.checkoutSteps.slice(0, 2), messages.deliveryAddressStep, ...messages.checkoutSteps.slice(2)]
+        : messages.checkoutSteps;
+    const checkoutNavigation = useCheckoutNavigation({ setOpen: setCheckoutSheetOpen, setReviewOpen: setPaymentReviewOpen, canReview: Boolean(paymentReviewContext?.quote || quote), busy, paymentStep });
     const paymentSubmissionLock = useRef(false);
     const quoteSubmissionLock = useRef(false);
     const withMessages = (node) => (
@@ -1157,12 +1184,27 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             setBuyerDetailsOpen(false);
         }
         setBuyerDetailsLoaded(true);
+        const savedAddress = readSavedDeliveryAddress(deliveryStorage());
+        if (savedAddress) {
+            setDeliveryAddress(savedAddress);
+            setSavedDeliveryAddress(savedAddress);
+        } else {
+            const locales = typeof navigator === 'undefined' ? [] : navigator.languages?.length ? navigator.languages : [navigator.language];
+            const suggestedCountry = deliveryCountrySuggestion(detectedDeliveryCountry, locales);
+            if (suggestedCountry) setDeliveryAddress(current => current.countryCode ? current : { ...current, countryCode: suggestedCountry });
+        }
     }, []);
 
     useEffect(() => {
         if (!buyerDetailsLoaded) return;
         storeBuyerDetails(buyer);
     }, [buyer, buyerDetailsLoaded]);
+
+    useEffect(() => {
+        if (!deliveryRedirect || busy || !deliveryRequired) return;
+        checkoutNavigation.go(2);
+        setDeliveryRedirect(false);
+    }, [deliveryRedirect, busy, deliveryRequired, checkoutNavigation.go]);
 
     useEffect(() => {
         const reviewSlug = store?.slug || slug;
@@ -1187,7 +1229,6 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         };
     }, [store?.slug, slug]);
 
-    const cartItems = useMemo(() => storefrontCartItems(products, cart), [cart, products]);
     const expectedTrainingIds = useMemo(() => cartItems.filter(({ product }) => isTraining(product)).map(({ product }) => product.id), [cartItems]);
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -1199,8 +1240,11 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
     const selectedCountry = COUNTRIES_BY_CODE[countryCode] || COUNTRIES_BY_CODE.CD;
     const selectedBuyerCountry = contactCountry(buyer.phone, COUNTRIES_BY_CODE[buyerCountryCode] || COUNTRIES_BY_CODE.CD);
     const mobileMoneyPhone = paymentPhone ?? (buyer.phone.startsWith(`+${selectedCountry.callingCode}`) ? buyer.phone : '');
+    const paymentPhoneError = !paymentReviewOpen && flowError?.field === 'paymentPhone' ? flowError : null;
     const contactLocked = Boolean(order?.reference && paymentOrderReference === order.reference);
     const unresolvedPaymentAttempt = paymentAttemptNeedsRecovery(order, paymentOrderReference);
+    const currentAddressIsSaved = Boolean(savedDeliveryAddress)
+        && JSON.stringify(normalizeDeliveryAddress(deliveryAddress)) === JSON.stringify(savedDeliveryAddress);
     const filteredCountries = useMemo(() => {
         const query = countryQuery.trim().toLowerCase();
         if (!query) return COUNTRY_OPTIONS;
@@ -1249,9 +1293,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setQuantity(productId, number(cart[productId]) + delta);
     };
 
-    const updateBuyer = (updater) => {
-        if (contactLocked || unresolvedPaymentAttempt) return;
-        setBuyer(updater);
+    const invalidateContactSnapshot = () => {
         setQuote(null);
         setPaymentReviewOpen(false);
         setPaymentReviewContext(null);
@@ -1262,6 +1304,51 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         setOrder(null);
         setShowOrderPaymentView(false);
         setFlowError(null);
+    };
+
+    const updateBuyer = (updater) => {
+        if (contactLocked || unresolvedPaymentAttempt) return;
+        setBuyer(updater);
+        invalidateContactSnapshot();
+    };
+
+    const updateDeliveryAddress = (updater) => {
+        if (contactLocked || unresolvedPaymentAttempt) return;
+        setDeliveryAddress(updater);
+        setAddressSaveError((error) => error === 'forget' ? error : false);
+        invalidateContactSnapshot();
+    };
+
+    const rememberAddress = () => {
+        if (Object.keys(deliveryAddressErrors(deliveryAddress)).length) return false;
+        if (rememberDeliveryAddress) {
+            const address = normalizeDeliveryAddress(deliveryAddress);
+            const saved = saveDeliveryAddress(deliveryStorage(), address);
+            if (saved) setSavedDeliveryAddress(address);
+            setAddressSaveError(saved ? false : 'save');
+        } else {
+            const removed = forgetDeliveryAddress(deliveryStorage());
+            if (removed) setSavedDeliveryAddress(null);
+            setAddressSaveError(removed ? false : 'forget');
+        }
+        return true;
+    };
+
+    const updateRememberAddress = (remember) => {
+        setRememberDeliveryAddress(remember);
+        setAddressSaveError(false);
+        if (!remember) {
+            const removed = forgetDeliveryAddress(deliveryStorage());
+            if (removed) setSavedDeliveryAddress(null);
+            setAddressSaveError(removed ? false : 'forget');
+        }
+    };
+
+    const forgetSavedAddress = () => {
+        const removed = forgetDeliveryAddress(deliveryStorage());
+        if (removed) setSavedDeliveryAddress(null);
+        setRememberDeliveryAddress(false);
+        setAddressSaveError(removed ? false : 'forget');
     };
 
     const updatePaymentPhone = (value) => {
@@ -1312,6 +1399,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         if (!cartItems.length) return messages.chooseAtLeastOneProduct;
         if (!buyer.name.trim()) return messages.buyerNameRequired;
         if (!buyer.phone.trim()) return messages.buyerPhoneRequired;
+        if (deliveryRequired && Object.keys(deliveryAddressErrors(deliveryAddress)).length) return messages.deliveryAddressRequired;
         const cartCurrency = cartItems.find(({ product }) => product?.priceCurrency)?.product?.priceCurrency || '';
         if (!cartCurrency && !currencies.billingCurrency.trim()) return messages.billingCurrencyRequired;
         if (!cartCurrency && !currencies.paymentCurrency.trim()) return messages.paymentCurrencyRequired;
@@ -1322,20 +1410,39 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         return null;
     };
 
+    const reportValidationError = (message) => {
+        const field = message === messages.mobileMoneyPhoneRequired ? 'paymentPhone' : null;
+        setFlowError({ message, errorCode: 'INVALID_REQUEST', ...(field ? { field } : {}) });
+        if (field && paymentReviewOpen) checkoutNavigation.closeReview();
+    };
+
     const ensureOrder = async (method) => ensureCommerceOrder({
         order,
         checkout,
-        payload: checkoutPayload(cartItems, buyer, currencies, method),
+        payload: checkoutPayload(cartItems, buyer, currencies, method, deliveryRequired ? deliveryAddress : null),
         paymentAttempted: Boolean(paymentOrderReference),
         paymentAlreadyStartedMessage: messages.paymentAlreadyStarted,
         getOrder: (existing) => apiFetch(
             `/public/commerce/orders/${encodeURIComponent(existing.reference)}?accessToken=${encodeURIComponent(existing.accessToken)}`
         ),
-        createCheckout: (payload) => apiFetch('/public/commerce/checkouts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept-Language': messages.language },
-            body: JSON.stringify(payload),
-        }),
+        createCheckout: async (payload) => {
+            const created = await apiFetch('/public/commerce/checkouts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept-Language': messages.language },
+                body: JSON.stringify(payload),
+            });
+            if (created.deliveryAddressRequired === true) setServerDeliveryRequirement({ cartKey: deliveryCartKey, required: true });
+            if (created.deliveryAddressRequired && (created.deliveryAddressMissing || !created.deliveryAddress)) {
+                // This draft has no valid delivery snapshot. Keep the cart-scoped
+                // requirement, but recreate checkout after the buyer supplies it.
+                setCheckout(null);
+                setDeliveryRedirect(true);
+                const error = new Error(messages.deliveryAddressRequired);
+                error.errorCode = 'COMMERCE_DELIVERY_ADDRESS_REQUIRED';
+                throw error;
+            }
+            return created;
+        },
         createOrder: (draft) => apiFetch(
             `/public/commerce/checkouts/${encodeURIComponent(draft.id)}/orders?accessToken=${encodeURIComponent(draft.accessToken || '')}`,
             { method: 'POST', headers: { 'Accept-Language': messages.language } }
@@ -1409,7 +1516,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         if (quoteSubmissionLock.current) return;
         const validation = validate();
         if (validation) {
-            setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
+            reportValidationError(validation);
             return;
         }
 
@@ -1471,7 +1578,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
         if (paymentSubmissionLock.current) return;
         const validation = validate();
         if (validation) {
-            setFlowError({ message: validation, errorCode: 'INVALID_REQUEST' });
+            reportValidationError(validation);
             return;
         }
 
@@ -1786,6 +1893,10 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             onClose={checkoutNavigation.closeReview}
             buyer={buyer}
             onEditBuyer={checkoutSheetOpen && !contactLocked ? () => checkoutNavigation.go(1) : undefined}
+            checkoutLabels={checkoutLabels}
+            deliveryAddress={deliveryRequired ? (paymentReviewContext?.order?.deliveryAddress || deliveryAddress) : null}
+            onEditDelivery={checkoutSheetOpen && !contactLocked && !unresolvedPaymentAttempt ? () => checkoutNavigation.go(2) : undefined}
+            addressSaveError={addressSaveError}
             onConfirm={confirmPayment}
         />
     ) : null;
@@ -1810,6 +1921,8 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
             reference={paymentPrompt.reference}
             total={paymentPrompt.total}
             fulfillmentItems={paymentPrompt.fulfillmentItems}
+            deliveryOrder={order}
+            buyer={buyer}
             onRefreshFulfillment={refreshPaidFulfillment}
             onReceipt={() => setReceiptOpen(true)}
             onClose={() => setPaymentPrompt(null)}
@@ -1843,10 +1956,12 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                     </dl>
 
                     <PaymentHandoff order={order} />
+                    <BuyerDeliveryDetails order={order} buyer={buyer} />
                     {expectedTrainingIds.length > 0 && !isOrderPaid(order) && <p role="status">{messages.trainingAccessInactive}</p>}
                     <OrderPaymentPanel
                         order={order}
                         paymentPhone={mobileMoneyPhone}
+                        paymentPhoneError={paymentPhoneError}
                         setPaymentPhone={updatePaymentPhone}
                         paymentMethod={paymentMethod}
                         setPaymentMethod={updatePaymentMethod}
@@ -1931,6 +2046,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         buyer={buyer}
                         setBuyer={updateBuyer}
                         paymentPhone={mobileMoneyPhone}
+                        paymentPhoneError={paymentPhoneError}
                         setPaymentPhone={updatePaymentPhone}
                         currencies={currencies}
                         paymentMethod={paymentMethod}
@@ -1950,6 +2066,16 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         buyerCountry={selectedBuyerCountry}
                         onOpenBuyerCountryPicker={() => openCountryPicker('BUYER')}
                         contactLocked={contactLocked}
+                        deliveryRequired={deliveryRequired}
+                        deliveryAddress={deliveryAddress}
+                        setDeliveryAddress={updateDeliveryAddress}
+                        savedDeliveryAddress={currentAddressIsSaved}
+                        rememberDeliveryAddress={rememberDeliveryAddress}
+                        onRememberDeliveryAddress={updateRememberAddress}
+                        onForgetDeliveryAddress={forgetSavedAddress}
+                        onSaveDeliveryAddress={rememberAddress}
+                        addressSaveError={addressSaveError}
+                        checkoutLabels={checkoutLabels}
                         buyerDetailsOpen={buyerDetailsOpen}
                         setBuyerDetailsOpen={setBuyerDetailsOpen}
                         onOpenCountryPicker={() => openCountryPicker('PAYMENT')}
@@ -2029,6 +2155,7 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         buyer={buyer}
                         setBuyer={updateBuyer}
                         paymentPhone={mobileMoneyPhone}
+                        paymentPhoneError={paymentPhoneError}
                         setPaymentPhone={updatePaymentPhone}
                         currencies={currencies}
                         paymentMethod={paymentMethod}
@@ -2048,6 +2175,16 @@ export default function Storefront({ slug, productLookup, productSlug, initialSt
                         buyerCountry={selectedBuyerCountry}
                         onOpenBuyerCountryPicker={() => openCountryPicker('BUYER')}
                         contactLocked={contactLocked}
+                        deliveryRequired={deliveryRequired}
+                        deliveryAddress={deliveryAddress}
+                        setDeliveryAddress={updateDeliveryAddress}
+                        savedDeliveryAddress={currentAddressIsSaved}
+                        rememberDeliveryAddress={rememberDeliveryAddress}
+                        onRememberDeliveryAddress={updateRememberAddress}
+                        onForgetDeliveryAddress={forgetSavedAddress}
+                        onSaveDeliveryAddress={rememberAddress}
+                        addressSaveError={addressSaveError}
+                        checkoutLabels={checkoutLabels}
                         buyerDetailsOpen={buyerDetailsOpen}
                         setBuyerDetailsOpen={setBuyerDetailsOpen}
                         onOpenCountryPicker={() => openCountryPicker('PAYMENT')}
@@ -2890,6 +3027,12 @@ function BuyerContactSummary({ buyer }) {
     return <div><strong>{buyer.name}</strong><span>{buyer.phone}</span>{buyer.email && <span>{buyer.email}</span>}{WHATSAPP_DELIVERY_ENABLED && buyer.whatsappDeliveryOptIn && <small className="buyer-whatsapp-summary"><WhatsAppIcon />{messages.whatsappDeliverySelected}</small>}</div>;
 }
 
+function BuyerDeliveryDetails({ order, buyer }) {
+    const messages = useCommerceMessages();
+    if (!order?.deliveryAddress) return null;
+    return <section className="checkout-delivery-order"><BuyerContactSummary buyer={{ name: order.buyerName || buyer?.name || '', phone: order.buyerPhone || buyer?.phone || '', email: order.buyerEmail || buyer?.email || '' }} /><DeliveryAddressSummary address={order.deliveryAddress} language={messages.language} /></section>;
+}
+
 function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, onOpenCountryPicker }) {
     const messages = useCommerceMessages();
     const hasDetails = hasBuyerDetails(buyer);
@@ -2927,14 +3070,18 @@ function BuyerDetailsSection({ buyer, setBuyer, selectedCountry, open, setOpen, 
 }
 
 function CheckoutPaymentForm({
-    cartItems, navigation, buyer, setBuyer, paymentPhone, setPaymentPhone, paymentMethod, setPaymentMethod, onRetryPaymentMethods, onRetryNetworks,
+    cartItems, navigation, buyer, setBuyer, paymentPhone, paymentPhoneError, setPaymentPhone, paymentMethod, setPaymentMethod, onRetryPaymentMethods, onRetryNetworks,
     paymentMethods, paymentMethodsLoading, paymentMethodsError, paymentMethodsLoaded,
     cryptoNetworks, cryptoNetworksLoading, cryptoNetworksError, selectedCryptoNetworkId,
     setSelectedCryptoNetworkId, selectedCountry, onOpenCountryPicker, buyerCountry, onOpenBuyerCountryPicker, contactLocked, flowError, busy,
     appCheckoutLink, showAppCheckout, showAppInstallFallback, onOpenAppCheckout, onConfirm,
+    deliveryRequired, deliveryAddress, setDeliveryAddress, savedDeliveryAddress,
+    rememberDeliveryAddress, onRememberDeliveryAddress, onForgetDeliveryAddress, onSaveDeliveryAddress,
+    addressSaveError, checkoutLabels,
 }) {
     const messages = useCommerceMessages();
     const step = navigation.step;
+    const paymentStep = deliveryRequired ? 3 : 2;
     const [attempted, setAttempted] = useState(null);
     const panel = useRef(null);
     const heading = useRef(null);
@@ -2942,14 +3089,15 @@ function CheckoutPaymentForm({
         ...(!buyer.name.trim() ? { name: messages.buyerNameRequired } : {}),
         ...(!buyer.phone.trim() ? { phone: messages.buyerPhoneRequired } : {}),
     } : {};
+    const addressErrors = deliveryRequired && attempted === 2 ? deliveryAddressErrors(deliveryAddress) : {};
     const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod);
     const localError = attempted === 0 && !cartItems.length ? messages.chooseAtLeastOneProduct
-        : attempted === 2 && !selectedMethod ? messages.noPaymentSelected
-        : attempted === 2 && selectedMethod?.type === 'CRYPTO' && !selectedCryptoNetworkId ? messages.chooseCryptoNetwork
+        : attempted === paymentStep && !selectedMethod ? messages.noPaymentSelected
+        : attempted === paymentStep && selectedMethod?.type === 'CRYPTO' && !selectedCryptoNetworkId ? messages.chooseCryptoNetwork
         : null;
-    const titles = [messages.orderQuestion, messages.detailsQuestion, messages.methodQuestion];
-    const helpers = [messages.orderHelper, messages.detailsHelper, messages.methodHelper];
-    const icons = ['bag', 'user', 'card'];
+    const titles = [messages.orderQuestion, messages.detailsQuestion, ...(deliveryRequired ? [messages.deliveryAddressQuestion] : []), messages.methodQuestion];
+    const helpers = [messages.orderHelper, messages.detailsHelper, ...(deliveryRequired ? [messages.deliveryAddressHelper] : []), messages.methodHelper];
+    const icons = ['bag', 'user', ...(deliveryRequired ? ['delivery'] : []), 'card'];
     useEffect(() => {
         setAttempted(null);
         heading.current?.focus({ preventScroll: true });
@@ -2963,7 +3111,15 @@ function CheckoutPaymentForm({
             requestAnimationFrame(() => panel.current?.querySelector('[aria-invalid="true"]')?.focus({ preventScroll: true }));
             return;
         }
-        if (step === 2) {
+        if (deliveryRequired && step === 2 && !onSaveDeliveryAddress()) {
+            requestAnimationFrame(() => panel.current?.querySelector('[aria-invalid="true"]')?.focus({ preventScroll: true }));
+            return;
+        }
+        if (step === paymentStep) {
+            if (deliveryRequired && Object.keys(deliveryAddressErrors(deliveryAddress)).length) {
+                navigation.go(2);
+                return;
+            }
             if (!selectedMethod || (selectedMethod.type === 'CRYPTO' && !selectedCryptoNetworkId)) return;
             if (document.activeElement?.tagName === 'INPUT') document.activeElement.blur();
             onConfirm();
@@ -2975,11 +3131,11 @@ function CheckoutPaymentForm({
     const subtotal = formatCartTotals(cartItems);
     return (
         <section className="guided-checkout" aria-label={messages.payment} ref={panel} onKeyDown={(event) => { if (event.key === 'Enter' && event.target.tagName === 'INPUT' && event.target.type !== 'radio') event.preventDefault(); }}>
-            <StepProgress step={step} labels={messages.checkoutSteps} text={interpolate(messages.stepOf, { step: step + 1, total: 4 })} />
-            <div className="checkout-task-scroll commerce-scroll-region" role="region" aria-label={messages.checkoutSteps[step]} tabIndex={0}>
+            <StepProgress step={step} labels={checkoutLabels} text={interpolate(messages.stepOf, { step: step + 1, total: checkoutLabels.length })} />
+            <div className="checkout-task-scroll commerce-scroll-region" role="region" aria-label={checkoutLabels[step]} tabIndex={0}>
             <div className="checkout-task-grid">
                 <div className="checkout-task-card">
-                    <header className="checkout-task-heading">
+                    <header className={`checkout-task-heading${step === paymentStep ? ' checkout-task-heading--payment' : ''}`}>
                         <span className={`commerce-icon-tile commerce-icon-tile--${step === 1 ? 'blue' : 'green'}`}><CommerceIcon name={icons[step]} size={24} /></span>
                         <h3 tabIndex={-1} ref={heading} aria-live="polite">{titles[step]}</h3>
                         <p>{helpers[step]}</p>
@@ -2999,11 +3155,16 @@ function CheckoutPaymentForm({
                         </div>
                     )}
                     {step === 1 && <><BuyerFields buyer={buyer} setBuyer={setBuyer} selectedCountry={buyerCountry} onOpenCountryPicker={onOpenBuyerCountryPicker} errors={errors} disabled={busy || contactLocked} />{contactLocked && <p className="buyer-contact-help">{messages.contactLocked}</p>}</>}
-                    {step === 2 && (
+                    {deliveryRequired && step === 2 && <>
+                        <DeliveryAddressFields value={deliveryAddress} onChange={setDeliveryAddress} language={messages.language} errors={addressErrors} disabled={busy || contactLocked} remember={rememberDeliveryAddress} onRememberChange={onRememberDeliveryAddress} saved={savedDeliveryAddress} onForgetSaved={onForgetDeliveryAddress} />
+                        {addressSaveError && <p className="buyer-contact-help" role="status">{addressSaveError === 'forget' ? messages.deliveryAddressNotForgotten : messages.deliveryAddressNotSaved}</p>}
+                        {contactLocked && <p className="buyer-contact-help">{messages.contactLocked}</p>}
+                    </>}
+                    {step === paymentStep && (
                         <>
-                            <div className="checkout-contact-review"><BuyerContactSummary buyer={buyer} /><button type="button" className="commerce-text-button" onClick={() => navigation.go(1)} disabled={busy || contactLocked} title={contactLocked ? messages.contactLocked : undefined}>{messages.edit}</button></div>
                             <PaymentMethodPicker
                                 paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} paymentPhone={paymentPhone} setPaymentPhone={setPaymentPhone}
+                                phoneError={paymentPhoneError}
                                 methods={paymentMethods} loading={paymentMethodsLoading} error={paymentMethodsError} loaded={paymentMethodsLoaded} onRetry={onRetryPaymentMethods} onRetryNetworks={onRetryNetworks}
                                 cryptoNetworks={cryptoNetworks} cryptoNetworksLoading={cryptoNetworksLoading} cryptoNetworksError={cryptoNetworksError}
                                 selectedCryptoNetworkId={selectedCryptoNetworkId} setSelectedCryptoNetworkId={setSelectedCryptoNetworkId}
@@ -3012,7 +3173,7 @@ function CheckoutPaymentForm({
                             {showAppCheckout && <FondekaAppPaymentPanel appCheckoutLink={appCheckoutLink} disabled={!cartItems.length || busy} showInstallFallback={showAppInstallFallback} onOpen={onOpenAppCheckout} />}
                         </>
                     )}
-                    {Object.keys(errors).length > 0 && <div className="inline-error" role="alert">{messages.checkDetails}</div>}
+                    {(Object.keys(errors).length > 0 || Object.keys(addressErrors).length > 0) && <div className="inline-error" role="alert">{messages.checkDetails}</div>}
                 </div>
                 <aside className="checkout-side-summary" aria-label={messages.orderSummary}>
                     <CommerceIcon name="bag" size={22} /><h3>{messages.orderSummary}</h3>
@@ -3025,11 +3186,11 @@ function CheckoutPaymentForm({
             </div>
             <div className="checkout-flow-footer">
             {localError && <InlineError message={localError} />}
-            {step === 2 && flowError && (isFeatureDisabled(flowError) ? <Unavailable message={flowError.message} /> : <InlineError message={flowError.message} />)}
+            {(step === paymentStep || (deliveryRequired && step === 2)) && flowError && flowError.field !== 'paymentPhone' && (isFeatureDisabled(flowError) ? <Unavailable message={flowError.message} /> : <InlineError message={flowError.message} />)}
             <footer className="checkout-flow-actions">
                 <button type="button" className="button secondary" onClick={navigation.back} disabled={busy}><CommerceIcon name="back" size={18} />{messages.back}</button>
                 <button type="button" className="button primary" onClick={next} disabled={busy || !cartItems.length}>
-                    {busy ? <LoadingButtonLabel label={messages.quoteLoading} /> : <>{step === 2 ? messages.reviewAction : messages.nextStep}<CommerceIcon name="arrow" size={18} /></>}
+                    {busy ? <LoadingButtonLabel label={messages.quoteLoading} /> : <>{step === paymentStep ? messages.reviewAction : messages.nextStep}<CommerceIcon name="arrow" size={18} /></>}
                 </button>
             </footer>
             </div>
@@ -3040,6 +3201,7 @@ function CheckoutPaymentForm({
 function OrderPaymentPanel({
     order,
     paymentPhone,
+    paymentPhoneError,
     setPaymentPhone,
     paymentMethod,
     setPaymentMethod,
@@ -3099,6 +3261,7 @@ function OrderPaymentPanel({
                     paymentMethod={paymentMethod}
                     setPaymentMethod={setPaymentMethod}
                     paymentPhone={paymentPhone}
+                    phoneError={paymentPhoneError}
                     setPaymentPhone={setPaymentPhone}
                     methods={paymentMethods}
                     loading={paymentMethodsLoading}
@@ -3130,7 +3293,7 @@ function OrderPaymentPanel({
                     />
                 )}
 
-                {flowError && (
+                {flowError && flowError.field !== 'paymentPhone' && (
                     isFeatureDisabled(flowError)
                         ? <Unavailable message={flowError.message} />
                         : <InlineError message={flowError.message} />
@@ -3174,6 +3337,7 @@ function PaymentMethodPicker({
     paymentMethod,
     setPaymentMethod,
     paymentPhone,
+    phoneError,
     setPaymentPhone,
     methods,
     loading,
@@ -3211,6 +3375,10 @@ function PaymentMethodPicker({
         }
         setExpanded({ [firstAvailableGroup]: true });
     }, [firstAvailableGroup, groupSignature, selectedCountry?.code]);
+
+    useLayoutEffect(() => {
+        if (phoneError && !disabled) setExpanded({ MOBILE_MONEY: true });
+    }, [phoneError, disabled]);
 
     const toggleGroup = (type) => {
         setExpanded((current) => ({ [type]: !current[type] }));
@@ -3297,6 +3465,7 @@ function PaymentMethodPicker({
                                     {type === 'MOBILE_MONEY' && grouped[type].some((method) => method.key === paymentMethod) && (
                                         <MobileMoneyPhoneSelector
                                             phone={paymentPhone}
+                                            error={phoneError}
                                             selectedCountry={selectedCountry}
                                             onChangeDigits={updatePaymentPhone}
                                             disabled={disabled}
@@ -3327,10 +3496,17 @@ function PaymentMethodPicker({
     );
 }
 
-function MobileMoneyPhoneSelector({ phone, selectedCountry, onChangeDigits, disabled }) {
+function MobileMoneyPhoneSelector({ phone, error, selectedCountry, onChangeDigits, disabled }) {
     const messages = useCommerceMessages();
     const phoneId = useId();
+    const input = useRef(null);
     const localPhone = nationalPhoneNumber(phone, selectedCountry);
+
+    useLayoutEffect(() => {
+        if (!error || disabled) return;
+        input.current?.focus({ preventScroll: true });
+        input.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }, [error, disabled]);
 
     return (
         <div className="mobile-money-phone-panel">
@@ -3345,7 +3521,10 @@ function MobileMoneyPhoneSelector({ phone, selectedCountry, onChangeDigits, disa
                 />
                 <input
                     className="mobile-money-number-input"
+                    ref={input}
                     id={phoneId}
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? `${phoneId}-error` : undefined}
                     enterKeyHint="done"
                     onKeyDown={(event) => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.blur(); } }}
                     type="tel"
@@ -3356,6 +3535,7 @@ function MobileMoneyPhoneSelector({ phone, selectedCountry, onChangeDigits, disa
                     disabled={disabled}
                 />
             </div>
+            {error && <p className="field-error" id={`${phoneId}-error`} role="alert">{error.message}</p>}
         </div>
     );
 }
@@ -3378,7 +3558,7 @@ function MobileMoneyPromptModal({ number, hint, onClose }) {
     );
 }
 
-function PaymentSuccessModal({ reference, total, fulfillmentItems, onRefreshFulfillment, onReceipt, onClose }) {
+function PaymentSuccessModal({ reference, total, fulfillmentItems, deliveryOrder, buyer, onRefreshFulfillment, onReceipt, onClose }) {
     const messages = useCommerceMessages();
     return (
         <DialogBackdrop className="payment-action-backdrop payment-success-backdrop" label={messages.paymentReceived} onClose={onClose} locked={false}>
@@ -3410,6 +3590,7 @@ function PaymentSuccessModal({ reference, total, fulfillmentItems, onRefreshFulf
                     )}
                 </div>
                 <PaidFulfillmentList items={fulfillmentItems} onRefresh={onRefreshFulfillment} />
+                <BuyerDeliveryDetails order={deliveryOrder} buyer={buyer} />
 	                <button type="button" className={fulfillmentItems?.some((item) => item.trainingPlayerUrl) ? 'payment-success-receipt-button' : 'payment-success-done'} onClick={onClose}>{messages.done}</button>
 	                <button type="button" className="payment-success-receipt-button" onClick={onReceipt}>{messages.receipt}</button>
             </div>
@@ -3511,7 +3692,7 @@ function CryptoPaymentModal({ address, amount, networkName, invoiceUrl, expiresA
     );
 }
 
-function PaymentReviewSheet({ quote, method, network, account, buyer, onEditBuyer, busy, error, onClose, onConfirm }) {
+function PaymentReviewSheet({ quote, method, network, account, buyer, onEditBuyer, checkoutLabels, deliveryAddress, onEditDelivery, addressSaveError, busy, error, onClose, onConfirm }) {
     const messages = useCommerceMessages();
     if (!quote) return null;
     const netAmount = quote.netAmount ?? quote.billingAmount ?? quote.itemSubtotalAmount;
@@ -3535,10 +3716,12 @@ function PaymentReviewSheet({ quote, method, network, account, buyer, onEditBuye
                     <button type="button" className="payment-review-close" onClick={onClose} disabled={busy} aria-label={messages.close}><CommerceIcon name="close" /></button>
                 </div>
 
-                <StepProgress step={3} labels={messages.checkoutSteps} text={interpolate(messages.stepOf, { step: 4, total: 4 })} />
+                <StepProgress step={checkoutLabels.length - 1} labels={checkoutLabels} text={interpolate(messages.stepOf, { step: checkoutLabels.length, total: checkoutLabels.length })} />
                 <div className="payment-review-scroll commerce-scroll-region" role="region" aria-label={messages.reviewPayment} tabIndex={0}>
                 <div className="review-identity"><span className="commerce-icon-tile"><CommerceIcon name="shield" size={26} /></span><p>{messages.reviewHelper}</p></div>
                 {buyer && <div className="checkout-contact-review"><BuyerContactSummary buyer={buyer} />{onEditBuyer && <button type="button" className="commerce-text-button" onClick={onEditBuyer} disabled={busy}>{messages.edit}</button>}</div>}
+                {deliveryAddress && <DeliveryAddressSummary address={deliveryAddress} language={messages.language} onEdit={onEditDelivery} disabled={busy} />}
+                {deliveryAddress && addressSaveError && <p className="buyer-contact-help" role="status">{addressSaveError === 'forget' ? messages.deliveryAddressNotForgotten : messages.deliveryAddressNotSaved}</p>}
                 <div className="payment-review-summary">
 	                    <ReviewSummaryLine label={messages.checkoutAmount} value={amount(netAmount, netCurrency)} />
 	                    <ReviewSummaryLine label={messages.fees} value={fees != null ? amount(fees, feeCurrency) : '-'} />

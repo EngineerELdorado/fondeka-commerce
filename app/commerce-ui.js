@@ -25,6 +25,7 @@ const paths = {
     share: <><path d="M12 16V3m-5 5 5-5 5 5M5 13v8h14v-8" /></>,
     user: <><circle cx="12" cy="7" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></>,
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    delivery: <><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
 };
 
 export function CommerceIcon({ name, size = 20, className = '' }) {
@@ -64,7 +65,7 @@ export function StepProgress({ step, labels, text }) {
             <div className="checkout-progress-track" role="progressbar" aria-label={text} aria-valuemin={1} aria-valuemax={labels.length} aria-valuenow={step + 1}>
                 <span style={{ width: `${((step + 1) / labels.length) * 100}%` }} />
             </div>
-            <ol className="checkout-step-path">
+            <ol className="checkout-step-path" style={{ '--checkout-step-count': labels.length }}>
                 {labels.map((label, index) => <li key={label} aria-current={index === step ? 'step' : undefined} className={index < step ? 'is-past' : index === step ? 'is-current' : ''}><span>{index < step ? <CommerceIcon name="check" size={12} /> : index + 1}</span>{label}</li>)}
             </ol>
         </div>
@@ -136,6 +137,8 @@ export function DialogBackdrop({ children, className, label, onClose, locked = f
         const keydown = (event) => {
             if (dialogs.at(-1) !== node) return;
             if (event.key === 'Escape') {
+                // An expanded picker handles Escape before the surrounding dialog.
+                if (event.target.closest?.('[data-dialog-escape-scope]')) return;
                 event.preventDefault();
                 event.stopPropagation();
                 if (!current.current.locked) current.current.onClose?.();
@@ -189,19 +192,19 @@ export function DialogBackdrop({ children, className, label, onClose, locked = f
 }
 
 // History contains only a local step and an ephemeral flow ID. It never contains buyer or access data.
-export function useCheckoutNavigation({ setOpen, setReviewOpen, canReview, busy }) {
+export function useCheckoutNavigation({ setOpen, setReviewOpen, canReview, busy, paymentStep = 2 }) {
     const [step, setStep] = useState(0);
     const session = useRef(null);
-    const latest = useRef({ setOpen, setReviewOpen, canReview, busy });
-    latest.current = { setOpen, setReviewOpen, canReview, busy };
+    const latest = useRef({ setOpen, setReviewOpen, canReview, busy, paymentStep });
+    latest.current = { setOpen, setReviewOpen, canReview, busy, paymentStep };
     useEffect(() => {
         const restore = () => {
             if (latest.current.busy) return;
             const entry = window.history.state?.commerceCheckout;
             if (session.current && entry?.id === session.current) {
-                setStep(Math.max(0, Math.min(2, entry.step)));
+                setStep(Math.max(0, Math.min(latest.current.paymentStep, entry.step)));
                 latest.current.setOpen(true);
-                latest.current.setReviewOpen(entry.step === 3 && latest.current.canReview);
+                latest.current.setReviewOpen(entry.step === latest.current.paymentStep + 1 && latest.current.canReview);
             } else {
                 latest.current.setOpen(false);
                 latest.current.setReviewOpen(false);
@@ -237,20 +240,20 @@ export function useCheckoutNavigation({ setOpen, setReviewOpen, canReview, busy 
     const review = useCallback(() => {
         const entry = window.history.state?.commerceCheckout;
         if (entry?.id === session.current && session.current) {
-            window.history.pushState({ ...window.history.state, commerceCheckout: { ...entry, step: 3, depth: entry.depth + 1 } }, '');
+            window.history.pushState({ ...window.history.state, commerceCheckout: { ...entry, step: latest.current.paymentStep + 1, depth: entry.depth + 1 } }, '');
         }
         latest.current.setReviewOpen(true);
     }, []);
     const closeReview = useCallback(() => {
         if (latest.current.busy) return;
         const entry = window.history.state?.commerceCheckout;
-        if (entry?.id === session.current && entry?.step === 3 && session.current) window.history.back();
+        if (entry?.id === session.current && entry?.step === latest.current.paymentStep + 1 && session.current) window.history.back();
         else latest.current.setReviewOpen(false);
     }, []);
     const finishReview = useCallback(() => {
         const entry = window.history.state?.commerceCheckout;
-        if (entry?.id === session.current && entry?.step === 3 && session.current) {
-            window.history.replaceState({ ...window.history.state, commerceCheckout: { ...entry, step: 2 } }, '');
+        if (entry?.id === session.current && entry?.step === latest.current.paymentStep + 1 && session.current) {
+            window.history.replaceState({ ...window.history.state, commerceCheckout: { ...entry, step: latest.current.paymentStep } }, '');
         }
         latest.current.setReviewOpen(false);
     }, []);
