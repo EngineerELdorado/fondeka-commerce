@@ -2331,14 +2331,14 @@ function ShareButton({ label = 'Share', text }) {
     );
 }
 
-function ProfileTopBar({ title = 'Fondeka Commerce', backHref = '/', variant = 'default' }) {
+function ProfileTopBar({ title = 'Fondeka Commerce', backHref, variant = 'default' }) {
     const messages = useCommerceMessages();
     const resolvedTitle = title === 'Fondeka Commerce' ? messages.fondekaCommerce : title === 'Product' ? messages.product : title;
     return (
         <div className={`profile-topbar${variant === 'product' ? ' profile-topbar--product' : ''}`}>
-            <a className="profile-back-button" href={backHref} aria-label={messages.back}>
+            {backHref ? <a className="profile-back-button" href={backHref} aria-label={messages.back}>
                 <CommerceIcon name="back" />
-            </a>
+            </a> : <span aria-hidden="true" />}
             {variant === 'product' ? (
                 <span className="profile-topbar-title"><span className="profile-topbar-identity" aria-hidden="true"><CommerceIcon name="bag" size={22} /></span><strong>{resolvedTitle}</strong></span>
             ) : <strong>{resolvedTitle}</strong>}
@@ -2832,7 +2832,7 @@ function ProductDetailPage({
 
     return (
         <div className="product-detail-page">
-            <ProfileTopBar title={messages.product} backHref={storeHref !== '#' ? storeHref : '/'} variant="product" />
+            <ProfileTopBar title={messages.product} backHref={storeHref !== '#' ? storeHref : undefined} variant="product" />
             <div className="product-detail-layout">
                 <section className="product-detail-media-col">
                     <div
