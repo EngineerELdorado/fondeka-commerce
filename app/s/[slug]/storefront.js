@@ -3135,7 +3135,7 @@ function CheckoutPaymentForm({
             <div className="checkout-task-scroll commerce-scroll-region" role="region" aria-label={checkoutLabels[step]} tabIndex={0}>
             <div className="checkout-task-grid">
                 <div className="checkout-task-card">
-                    <header className={`checkout-task-heading${step === paymentStep ? ' checkout-task-heading--payment' : ''}`}>
+                    <header className="checkout-task-heading">
                         <span className={`commerce-icon-tile commerce-icon-tile--${step === 1 ? 'blue' : 'green'}`}><CommerceIcon name={icons[step]} size={24} /></span>
                         <h3 tabIndex={-1} ref={heading} aria-live="polite">{titles[step]}</h3>
                         <p>{helpers[step]}</p>

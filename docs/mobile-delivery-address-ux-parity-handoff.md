@@ -2,7 +2,7 @@
 
 Apply the current Commerce delivery-address experience to `fondeka-expo` in both the checkout screen and checkout sheet. The interaction should match the web: **choose from location suggestions first, with manual typing available when a location is missing**. Country autofill, selected states, wording and recovery behavior are part of the same change.
 
-The current local web source is the reference; these changes are not yet committed. Read [the delivery component](../app/delivery-address.js), [its styles](../app/delivery-address.css), [country suggestion and validation helpers](../lib/commerce-delivery.mjs), and [checkout integration](../app/s/[slug]/storefront.js). The [delivery implementation notes](commerce-delivery-address.md) cover the wider checkout lifecycle.
+The current web source is the reference. Read [the delivery component](../app/delivery-address.js), [its styles](../app/delivery-address.css), [country suggestion and validation helpers](../lib/commerce-delivery.mjs), and [checkout integration](../app/s/[slug]/storefront.js). The [delivery implementation notes](commerce-delivery-address.md) cover the wider checkout lifecycle.
 
 ## Client adaptation points
 
@@ -54,7 +54,7 @@ Use one picker treatment for all three location fields. A selected location has 
 
 The payment-method step shows **payment controls only**: payment country, available methods, any payer/network details and payment actions. Omit both buyer-contact and delivery-address sections from this step, including collapsed address rows. Keep the buyer/address state and validation intact. Back returns to the preceding details step, and final review continues showing the complete buyer and delivery information with existing edit actions. Address-save messages belong to address entry and final review. Order/receipt views retain their address display.
 
-Place the payment title and helper together beside the icon, with the helper directly below the title, to keep the header compact. When the Mobile Money payment number is missing, reopen the selected Mobile Money section, scroll to its input and focus it so the buyer can type. Show the validation message beside that field, clear it on typing, and support repeated attempts after the section has been collapsed again. Keep buyer contact separate; entering a payer number must not rewrite the saved contact. Preserve focus and visibility when the keyboard reduces the available viewport.
+Use the same heading structure and styling as other checkout steps: icon, title below it, then helper text, following the app's shared responsive behavior. When the Mobile Money payment number is missing, reopen the selected Mobile Money section, scroll to its input and focus it so the buyer can type. Show the validation message beside that field, clear it on typing, and support repeated attempts after the section has been collapsed again. Keep buyer contact separate; entering a payer number must not rewrite the saved contact. Preserve focus and visibility when the keyboard reduces the available viewport.
 
 Web reference values are a 56px picker trigger, at least 48px result rows, 13–14px corners, 12–14px inner padding and 18–20px between field groups. Its selected palette uses `#E5F4EC`, `#267C55` and `#1B6444`; neutral borders use `#DCE4EF`. Adapt through the app's existing theme and native primitives while preserving these visual roles, legible input text and comfortable touch targets. Keep search, manual actions and checkout Continue reachable with the keyboard open and large text enabled.
 

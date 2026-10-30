@@ -32,7 +32,7 @@ Once payment has been attempted, contact/address edits are locked and existing o
 
 The payment-method step shows payment controls only: payment country, available methods, any payer/network details and payment actions. Buyer-contact and delivery-address summaries are absent from this step; Back returns to the preceding details step. Address-save messages remain on address entry and final review. Final payment review and the full buyer order/success view display the complete address, alongside buyer contact. Order/success views use the returned backend snapshot and localized `countryName`. The synthesized receipt does not receive an address copy. Merchant/staff/admin screens are outside this public-site repository.
 
-The payment title and helper sit beside the icon to reduce header height. A missing Mobile Money payment number reopens its method group, scrolls to the number input and focuses it. Its validation message appears beside the field with `aria-invalid` and `aria-describedby`; typing clears it. Repeated validation attempts focus the field again. Buyer contact remains separate from the payment number.
+The payment heading uses the same structure and styling as other checkout steps: icon, title below it, then helper text, with the shared responsive rules. A missing Mobile Money payment number reopens its method group, scrolls to the number input and focuses it. Its validation message appears beside the field with `aria-invalid` and `aria-describedby`; typing clears it. Repeated validation attempts focus the field again. Buyer contact remains separate from the payment number.
 
 ## Entry points
 
